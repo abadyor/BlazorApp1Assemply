@@ -1,0 +1,486 @@
+﻿
+   @*  @page "/add-dynamic-table"
+@using System.Net.Http.Json
+@inject HttpClient Http
+@inject NavigationManager NavigationManager
+@inject IJSRuntime JS
+
+<h3>إضافة بيانات ديناميكية</h3>
+
+<EditForm Model="addDynamicTableCommand" OnValidSubmit="HandleValidSubmit">
+    <DataAnnotationsValidator />
+    <ValidationSummary />
+
+    <div class="form-group">
+        <label for="item">العنصر:</label>
+        <InputText id="item" @bind-Value="addDynamicTableCommand.Item" class="form-control" />
+    </div>
+
+    <div class="form-group">
+        <label for="discription">الوصف:</label>
+        <InputText id="discription" @bind-Value="addDynamicTableCommand.Discription" class="form-control" />
+    </div>
+
+    <div class="form-group">
+        <label for="price">السعر:</label>
+        <InputNumber id="price" @bind-Value="addDynamicTableCommand.Price" class="form-control" />
+    </div>
+
+    <div class="form-group">
+        <label for="quantity">الكمية:</label>
+        <InputNumber id="quantity" @bind-Value="addDynamicTableCommand.Quantity" class="form-control" />
+    </div>
+
+    <div class="form-group">
+        <label for="countImage">عدد الصور:</label>
+        <InputNumber id="countImage" @bind-Value="addDynamicTableCommand.CountImage" class="form-control" />
+    </div>
+
+    <div class="form-group">
+        <label for="nameImage">اسم الصورة:</label>
+        <InputText id="nameImage" @bind-Value="addDynamicTableCommand.NameImage" class="form-control" />
+    </div>
+
+    <!-- إضافة إدخال لتحميل الصورة -->
+    <div class="form-group">
+        <label for="imageUpload">تحميل الصورة:</label>
+        <InputFile id="imageUpload" OnChange="OnInputFileChange" />
+    </div>
+
+    <button type="submit" class="btn btn-primary">إرسال</button>
+</EditForm>
+
+@if (!string.IsNullOrEmpty(message))
+{
+    <p class="alert alert-info">@message</p>
+}
+
+@code {
+    private Models.DaynamicTable addDynamicTableCommand = new Models.DaynamicTable();
+    private string message;
+    private IBrowserFile uploadedImage;
+    private string tableName;
+    private string item;
+    
+
+    protected override async Task OnInitializedAsync()
+    {
+        tableName = await JS.InvokeAsync<string>("sessionStorage.getItem", "TableName");
+        if (string.IsNullOrWhiteSpace(tableName))
+        {
+            throw new Exception("Table name is not set in session storage.");
+        }
+        addDynamicTableCommand.TableName = tableName;
+    }
+
+    private async Task OnInputFileChange(InputFileChangeEventArgs e)
+    {
+        uploadedImage = e.File; // حفظ الصورة في متغير ليتم رفعها لاحقًا إلى الخادم
+    }
+
+    private async Task HandleValidSubmit()
+    {
+        // تحقق من أن TableName ليس فارغًا
+        if (string.IsNullOrWhiteSpace(addDynamicTableCommand.TableName))
+        {
+            message = "TableName cannot be null or empty.";
+            return; // عدم الاستمرار في العملية إذا كانت فارغة
+        }
+
+        if (uploadedImage != null)
+        {
+            // رفع الصورة إلى الخادم
+            var imageFileName = await UploadImageToServer();
+            if (!string.IsNullOrEmpty(imageFileName))
+            {
+                addDynamicTableCommand.NameImage = imageFileName; // حفظ اسم الصورة المعدل في الحقل
+                addDynamicTableCommand.CountImage += 1;
+            }
+            else
+            {
+                message = "فشل في رفع الصورة.";
+                return;
+            }
+        }
+
+        // إرسال البيانات إلى API
+        var response = await Http.PostAsJsonAsync("https://localhost:7252/Control/AddDynamic", addDynamicTableCommand);
+
+        if (response.IsSuccessStatusCode)
+        {
+           
+            message = "تم إضافة البيانات بنجاح!";
+            ResetForm();
+        }
+        else
+        {
+            message = "حدث خطأ أثناء إضافة البيانات.";
+        }
+    }
+
+    private async Task<string> UploadImageToServer()
+    {
+        var content = new MultipartFormDataContent();
+        var stream = uploadedImage.OpenReadStream();
+
+        // تحديد مسار المجلد حيث سيتم حفظ الصورة
+        var uploadsPath = Path.Combine("wwwroot", "uploads", tableName);
+
+        // إضافة اسم فريد للصورة
+        var uniqueImageName = $"{addDynamicTableCommand.Item}_{DateTime.Now:yyyyMMddHHmmss}_{uploadedImage.Name}";
+
+        // إضافة اسم الصورة إلى المحتوى
+        content.Add(new StreamContent(stream), "file", uniqueImageName);
+
+        // رفع الصورة إلى API
+        var response = await Http.PostAsync($"https://localhost:7252/Control/UploadImage?folder={tableName}", content);
+
+        if (response.IsSuccessStatusCode)
+        {
+            return uniqueImageName; // إعادة اسم الصورة لاستخدامه في الحفظ في قاعدة البيانات
+        }
+
+        return null;
+    }
+
+    private void ResetForm()
+    {
+        addDynamicTableCommand = new Models.DaynamicTable { TableName = tableName,Item=item };
+        message = string.Empty;
+    }
+}
+
+ *@
+
+@*  @page "/add-dynamic-table"
+@using System.Net.Http.Json
+@inject HttpClient Http
+@inject NavigationManager NavigationManager
+@inject IJSRuntime JS
+
+<h3>إضافة بيانات ديناميكية</h3>
+
+<EditForm Model="addDynamicTableCommand" OnValidSubmit="HandleValidSubmit">
+    <DataAnnotationsValidator />
+    <ValidationSummary />
+
+    <div class="form-group">
+        <label for="item">العنصر:</label>
+        <InputText id="item" @bind-Value="addDynamicTableCommand.Item" class="form-control" />
+    </div>
+
+    <div class="form-group">
+        <label for="discription">الوصف:</label>
+        <InputText id="discription" @bind-Value="addDynamicTableCommand.Discription" class="form-control" />
+    </div>
+
+    <div class="form-group">
+        <label for="price">السعر:</label>
+        <InputNumber id="price" @bind-Value="addDynamicTableCommand.Price" class="form-control" />
+    </div>
+
+    <div class="form-group">
+        <label for="quantity">الكمية:</label>
+        <InputNumber id="quantity" @bind-Value="addDynamicTableCommand.Quantity" class="form-control" />
+    </div>
+
+    <div class="form-group">
+        <label for="countImage">عدد الصور:</label>
+        <InputNumber id="countImage" @bind-Value="addDynamicTableCommand.CountImage" class="form-control" />
+    </div>
+
+    <div class="form-group">
+        <label for="nameImage">اسم الصورة:</label>
+        <InputText id="nameImage" @bind-Value="addDynamicTableCommand.NameImage" class="form-control" />
+    </div>
+
+    <!-- إضافة إدخال لتحميل الصورة -->
+    <div class="form-group">
+        <label for="imageUpload">تحميل الصورة:</label>
+        <InputFile id="imageUpload" OnChange="OnInputFileChange" />
+    </div>
+
+    <button type="button" class="btn btn-secondary" @onclick="AddAnotherImage">إضافة صورة أخرى</button>
+
+    <button type="submit" class="btn btn-primary">إرسال</button>
+</EditForm>
+
+@if (!string.IsNullOrEmpty(message))
+{
+    <p class="alert alert-info">@message</p>
+}
+
+@code {
+    private Models.DaynamicTable addDynamicTableCommand = new Models.DaynamicTable();
+    private string message;
+    private IBrowserFile uploadedImage;
+    private string tableName;
+    private string item;
+    private bool imageAdded = false; // لتتبع ما إذا تم إضافة صورة بالفعل
+
+    protected override async Task OnInitializedAsync()
+    {
+        tableName = await JS.InvokeAsync<string>("sessionStorage.getItem", "TableName");
+        if (string.IsNullOrWhiteSpace(tableName))
+        {
+            throw new Exception("Table name is not set in session storage.");
+        }
+        addDynamicTableCommand.TableName = tableName;
+    }
+
+    private async Task OnInputFileChange(InputFileChangeEventArgs e)
+    {
+        uploadedImage = e.File; // حفظ الصورة في متغير ليتم رفعها لاحقًا إلى الخادم
+    }
+
+    private async Task HandleValidSubmit()
+    {
+        // تحقق من أن TableName ليس فارغًا
+        if (string.IsNullOrWhiteSpace(addDynamicTableCommand.TableName))
+        {
+            message = "TableName cannot be null or empty.";
+            return; // عدم الاستمرار في العملية إذا كانت فارغة
+        }
+
+        if (uploadedImage != null)
+        {
+            // رفع الصورة إلى الخادم
+            var imageFileName = await UploadImageToServer();
+            if (!string.IsNullOrEmpty(imageFileName))
+            {
+                addDynamicTableCommand.NameImage = imageFileName; // حفظ اسم الصورة المعدل في الحقل
+                addDynamicTableCommand.CountImage += 1;
+                imageAdded = true;
+            }
+            else
+            {
+                message = "فشل في رفع الصورة.";
+                return;
+            }
+        }
+
+        // إرسال البيانات إلى API
+        var response = await Http.PostAsJsonAsync("https://localhost:7252/Control/AddDynamic", addDynamicTableCommand);
+
+        if (response.IsSuccessStatusCode)
+        {
+            message = "تم إضافة البيانات بنجاح!";
+            ResetForm();
+        }
+        else
+        {
+            message = "حدث خطأ أثناء إضافة البيانات.";
+        }
+    }
+
+    private async Task<string> UploadImageToServer()
+    {
+        var content = new MultipartFormDataContent();
+        var stream = uploadedImage.OpenReadStream();
+
+        // تحديد مسار المجلد حيث سيتم حفظ الصورة
+        var uploadsPath = Path.Combine("wwwroot", "uploads", tableName);
+
+        // إضافة اسم فريد للصورة
+        var uniqueImageName = $"{addDynamicTableCommand.Item}_{DateTime.Now:yyyyMMddHHmmss}_{uploadedImage.Name}";
+
+        // إضافة اسم الصورة إلى المحتوى
+        content.Add(new StreamContent(stream), "file", uniqueImageName);
+
+        // رفع الصورة إلى API
+        var response = await Http.PostAsync($"https://localhost:7252/Control/UploadImage?folder={tableName}", content);
+
+        if (response.IsSuccessStatusCode)
+        {
+            return uniqueImageName; // إعادة اسم الصورة لاستخدامه في الحفظ في قاعدة البيانات
+        }
+
+        return null;
+    }
+
+    private void ResetForm()
+    {
+        addDynamicTableCommand = new Models.DaynamicTable { TableName = tableName, Item = item };
+        message = string.Empty;
+        imageAdded = false; // إعادة تعيين الحالة بعد إرسال البيانات
+    }
+
+    // وظيفة لتمكين إضافة صورة أخرى بعد رفع الصورة الأولى
+    private void AddAnotherImage()
+    {
+        imageAdded = false; // إعادة تعيين حالة إضافة الصورة
+        uploadedImage = null; // مسح الصورة الحالية
+    }
+}
+ *@
+
+@page "/add-dynamic-table"
+@using System.Net.Http.Json
+@inject HttpClient Http
+@inject NavigationManager NavigationManager
+@inject IJSRuntime JS
+
+<h3>إضافة بيانات ديناميكية</h3>
+
+<EditForm Model="addDynamicTableCommand" OnValidSubmit="HandleValidSubmit">
+    <DataAnnotationsValidator />
+    <ValidationSummary />
+
+    <div class="form-group">
+        <label for="item">العنصر:</label>
+        <InputText id="item" @bind-Value="addDynamicTableCommand.Item" class="form-control" disabled="@(AddQuery == false)" />
+    </div>
+
+    <div class="form-group">
+        <label for="discription">الوصف:</label>
+        <InputText id="discription" @bind-Value="addDynamicTableCommand.Discription" class="form-control" disabled="@(AddQuery == false)" />
+    </div>
+
+    <div class="form-group">
+        <label for="price">السعر:</label>
+        <InputNumber id="price" @bind-Value="addDynamicTableCommand.Price" class="form-control" disabled="@(AddQuery == false)" />
+    </div>
+
+    <div class="form-group">
+        <label for="quantity">الكمية:</label>
+        <InputNumber id="quantity" @bind-Value="addDynamicTableCommand.Quantity" class="form-control" disabled="@(AddQuery == false)" />
+    </div>
+
+    <div class="form-group">
+        <label for="countImage">عدد الصور:</label>
+        <InputNumber id="countImage" @bind-Value="addDynamicTableCommand.CountImage" class="form-control" disabled="false" />
+    </div>
+
+    <div class="form-group">
+        <label for="nameImage">اسم الصورة:</label>
+        <InputText id="nameImage" @bind-Value="addDynamicTableCommand.NameImage" class="form-control" />
+    </div>
+
+    <div class="form-group">
+        <label for="imageUpload">@imageUploadLabel:</label>
+        <InputFile id="imageUpload" OnChange="OnInputFileChange" />
+    </div>
+
+    <button type="submit" class="btn btn-primary">إرسال</button>
+    @* <button type="button" class="btn btn-secondary" @onclick="AddAnotherImage" disabled="@(imageAdded == false)">إضافة صورة أخرى</button> *@
+
+    <!-- الزر الذي يظهر فقط عند حدوث شرط معين -->
+    @if (showNewItemButton)
+    {
+        <button type="button" id="btnNew" class="btn btn-warning" @onclick="AddNewItem">إضافة عنصر جديد</button>
+    }
+</EditForm>
+
+@if (!string.IsNullOrEmpty(message))
+{
+    <p class="alert alert-info">@message</p>
+}
+
+@code {
+    private Models.DaynamicTable addDynamicTableCommand = new Models.DaynamicTable();
+    private string message;
+    private IBrowserFile uploadedImage;
+    private string tableName;
+    private bool AddQuery = true;
+    private bool imageAdded = false;
+    private bool showNewItemButton = false; // التحكم في مرئية زر "إضافة عنصر جديد"
+    private string imageUploadLabel = "تحميل الصورة";
+
+    protected override async Task OnInitializedAsync()
+    {
+        tableName = await JS.InvokeAsync<string>("sessionStorage.getItem", "TableName");
+        if (string.IsNullOrWhiteSpace(tableName))
+        {
+            throw new Exception("Table name is not set in session storage.");
+        }
+        addDynamicTableCommand.TableName = tableName;
+    }
+
+    private async Task OnInputFileChange(InputFileChangeEventArgs e)
+    {
+        uploadedImage = e.File;
+    }
+
+    private async Task HandleValidSubmit()
+    {
+        if (string.IsNullOrWhiteSpace(addDynamicTableCommand.TableName))
+        {
+            message = "TableName cannot be null or empty.";
+            return;
+        }
+
+        if (uploadedImage != null)
+        {
+            var imageFileName = await UploadImageToServer();
+            if (!string.IsNullOrEmpty(imageFileName))
+            {
+                addDynamicTableCommand.NameImage = imageFileName;
+                addDynamicTableCommand.CountImage += 1;
+                imageAdded = true;
+
+                imageUploadLabel = "إضافة صورة أخرى";
+                showNewItemButton = true; // إظهار زر "إضافة عنصر جديد" بعد إضافة الصورة الأولى
+            }
+            else
+            {
+                message = "فشل في رفع الصورة.";
+                return;
+            }
+        }
+
+        var response = await Http.PostAsJsonAsync("https://localhost:7252/Control/AddDynamic", addDynamicTableCommand);
+
+        if (response.IsSuccessStatusCode)
+        {
+            AddQuery = false;
+            message = "تم إضافة البيانات بنجاح!";
+            
+            ResetFormWhereInsert(addDynamicTableCommand.Item, addDynamicTableCommand.Discription,addDynamicTableCommand.Price,addDynamicTableCommand.Quantity);
+            // ResetForm();
+        }
+        else
+        {
+            message = "حدث خطأ أثناء إضافة البيانات.";
+        }
+    }
+
+    private async Task<string> UploadImageToServer()
+    {
+        var content = new MultipartFormDataContent();
+        var stream = uploadedImage.OpenReadStream();
+
+        var uploadsPath = Path.Combine("wwwroot", "uploads", tableName);
+        var uniqueImageName = $"{addDynamicTableCommand.Item}_{DateTime.Now:yyyyMMddHHmmss}_{uploadedImage.Name}";
+
+        content.Add(new StreamContent(stream), "file", uniqueImageName);
+        var response = await Http.PostAsync($"https://localhost:7252/Control/UploadImage?folder={tableName}", content);
+
+        return response.IsSuccessStatusCode ? uniqueImageName : null;
+    }
+
+
+    private void ResetFormWhereInsert(string item,string discription,decimal price,int quantity)
+    {
+        addDynamicTableCommand = new Models.DaynamicTable { TableName = tableName, Item = item, Discription = discription,Price=price,Quantity=quantity };
+    }
+
+    private void ResetForm()
+    {
+        addDynamicTableCommand = new Models.DaynamicTable { TableName = tableName};
+        message = string.Empty;
+        imageAdded = false;
+        showNewItemButton = false; // إخفاء زر "إضافة عنصر جديد" بعد إعادة تعيين النموذج
+        imageUploadLabel = "تحميل الصورة";
+    }
+
+    private void AddAnotherImage()
+    {
+        imageAdded = false;
+        uploadedImage = null;
+    }
+
+    private void AddNewItem()
+    {
+        ResetForm(); // إعادة تعيين النموذج بالكامل لإضافة عنصر جديد
+    }
+}

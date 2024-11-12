@@ -1,0 +1,185 @@
+﻿@page "/customer"
+@using BlazorApp1Assemply.Models
+ 
+
+
+<h3>إدارة العملاء</h3>
+
+<button class="btn btn-primary mb-3" @onclick="ShowAddModal">إضافة عميل</button>
+
+<table class="table table-striped">
+    <thead>
+        <tr>
+            <th>Id</th>
+            <th>الاسم</th>
+            <th>الكنية</th>
+            <th>الجنس</th>
+            <th>البريد الإلكتروني</th>
+            <th>الهاتف</th>
+            <th>اسم المستخدم</th>
+            <th>الإجراءات</th>
+        </tr>
+    </thead>
+    <tbody>
+        @if (Customers == null)
+        {
+            <tr>
+                <td colspan="8" class="text-center">جار التحميل...</td>
+            </tr>
+        }
+        else
+        {
+            @foreach (var customer in Customers)
+            {
+                <tr>
+                    <td>@customer.Id</td>
+                    <td>@customer.GivenNames</td>
+                    <td>@customer.Nickname</td>
+                    <td>@customer.Gender</td>
+                    <td>@customer.EmailAddress</td>
+                    <td>@customer.Mobile</td>
+                    <td>@customer.Username</td>
+                    <td>
+                        <button class="btn btn-warning btn-sm" @onclick="() => ShowEditModal(customer)">تعديل</button>
+                        <button class="btn btn-danger btn-sm" @onclick="() => DeleteCustomer(customer.Id)">حذف</button>
+                    </td>
+                </tr>
+            }
+        }
+    </tbody>
+</table>
+
+<!-- نافذة المودال لإضافة أو تعديل العميل -->
+@if (IsModalVisible)
+{
+    <div class="modal show" tabindex="-1" style="display: block;">
+        <div class="modal-dialog" role="document">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">@ModalTitle</h5>
+                    <button type="button" class="close" @onclick="HideModal">
+                        <span aria-hidden="true">&times;</span>
+                    </button>
+                </div>
+                <div class="modal-body">
+                    <EditForm Model="currentCustomer" OnValidSubmit="SaveCustomer">
+                        <DataAnnotationsValidator />
+                        <ValidationSummary />
+                        <div class="form-group">
+                            <label for="givenNames">الاسم</label>
+                            <InputText id="givenNames" class="form-control" @bind-Value="currentCustomer.GivenNames" required />
+                        </div>
+                        <div class="form-group">
+                            <label for="nickname">الكنية</label>
+                            <InputText id="nickname" class="form-control" @bind-Value="currentCustomer.Nickname" />
+                        </div>
+                        <div class="form-group">
+                            <label for="gender">الجنس</label>
+                            <InputSelect id="gender" class="form-control" @bind-Value="currentCustomer.Gender">
+                                <option value="">اختر الجنس</option>
+                                <option value="M">ذكر</option>
+                                <option value="F">أنثى</option>
+                            </InputSelect>
+                        </div>
+                        <div class="form-group">
+                            <label for="email">البريد الإلكتروني</label>
+                            <InputText id="email" type="email" class="form-control" @bind-Value="currentCustomer.EmailAddress" required />
+                        </div>
+                        <div class="form-group">
+                            <label for="mobile">الهاتف</label>
+                            <InputText id="mobile" class="form-control" @bind-Value="currentCustomer.Mobile" required />
+                        </div>
+                        <button type="submit" class="btn btn-primary">حفظ</button>
+                    </EditForm>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+   
+   
+    private List<Models.Customer> Customers { get; set; } = new();
+    private Models.Customer currentCustomer { get; set; } = new();
+    private string ModalTitle { get; set; } = "إضافة عميل";
+    private bool IsModalVisible { get; set; } = false;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadCustomers();
+    }
+
+    private async Task LoadCustomers()
+    {
+        try
+        {
+            var response = await Http.GetAsync("https://localhost:7252/Customer/Getall");
+            if (response.IsSuccessStatusCode)
+            {
+                Customers = await response.Content.ReadFromJsonAsync<List<Models.Customer>>();
+            }
+            else
+            {
+                Console.WriteLine($"Error: {response.StatusCode}");
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine("Error loading customers: " + ex.Message);
+        }
+    }
+
+    public void ShowAddModal()
+    {
+        currentCustomer = new Models.Customer();
+        ModalTitle = "إضافة عميل";
+        IsModalVisible = true;
+    }
+
+    public void ShowEditModal(Models.Customer customer)
+    {
+        currentCustomer = customer;
+        ModalTitle = "تعديل عميل";
+        IsModalVisible = true;
+    }
+
+    public async Task SaveCustomer()
+    {
+        try
+        {
+            if (currentCustomer.Id == 0)
+            {
+                await Http.PostAsJsonAsync("https://localhost:7252/Customer/Create", currentCustomer);
+            }
+            else
+            {
+                await Http.PutAsJsonAsync($"https://localhost:7252/Customer/Edit/{currentCustomer.Id}", currentCustomer);
+            }
+            await LoadCustomers();
+            HideModal();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine("Error saving customer: " + ex.Message);
+        }
+    }
+
+    public async Task DeleteCustomer(int id)
+    {
+        try
+        {
+            await Http.DeleteAsync($"https://localhost:7252/Customer/Delete/{id}");
+            await LoadCustomers();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine("Error deleting customer: " + ex.Message);
+        }
+    }
+
+    public void HideModal()
+    {
+        IsModalVisible = false;
+    }
+}

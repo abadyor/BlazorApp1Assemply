@@ -1,0 +1,209 @@
+﻿@page "/BasketAndBasket_s"
+@using System.Net.Http.Json
+@using System.Text.Json
+@inject HttpClient Http
+@inject NavigationManager NavigationManager
+@inject IJSRuntime JS
+
+<h3 style="text-align: center;">إدخال بيانات السلة</h3>
+
+<div class="form-container">
+    <EditForm Model="@BasketData" OnValidSubmit="AddItemToBasket">
+        <DataAnnotationsValidator />
+        <ValidationSummary />
+
+        <div class="form-group">
+            <label for="Item">Item:</label>
+            <InputText id="Item" @bind-Value="Item" class="form-control" disabled="false" />
+        </div>
+
+        <div class="form-group">
+            <label for="Description">Description:</label>
+            <InputText id="Description" @bind-Value="Description" class="form-control" disabled="false" />
+        </div>
+
+        <div class="form-group">
+            <label>السعر:</label>
+            <InputNumber @bind-Value="Price" class="form-control" disabled="false" />
+        </div>
+
+        <div class="form-group">
+            <label>الكمية:</label>
+            <InputNumber @bind-Value="BasketData.quantity" class="form-control" />
+        </div>
+
+        <div class="form-actions">
+            <button type="submit" class="btn btn-primary">إضافة إلى السلة</button>
+            <button type="button" class="btn btn-secondary" @onclick="ResetForm">إعادة تعيين</button>
+        </div>
+    </EditForm>
+
+   @*  <div class="basket-items">
+        <h4>عناصر السلة:</h4>
+        <ul>
+            @foreach (var item in BasketItems)
+            {
+                <li>@Item - @item.quantity - @item.totoal</li>
+            }
+        </ul>
+        <button class="btn btn-success" @onclick="ConfirmBasket">تأكيد الحجز</button>
+    </div> *@
+
+    <div class="basket-items">
+        <h4>عناصر السلة:</h4>
+        <ul>
+            @for (int i = 0; i < BasketItems.Count; i++)
+            {
+                <li> اسم الصنف @BasketItemNames[i] -الكمية @BasketItems[i].quantity - الاجمالي @BasketItems[i].totoal</li>
+            }
+        </ul>
+        <button class="btn btn-success" @onclick="ConfirmBasket">تأكيد الحجز</button>
+    </div>
+</div>
+
+<style>
+    .form-container {
+        max-width: 400px;
+        margin: 0 auto;
+        padding: 20px;
+        background-color: #f9f9f9;
+        border-radius: 8px;
+        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+    }
+
+    .form-group {
+        margin-bottom: 15px;
+    }
+
+    label {
+        font-weight: bold;
+        margin-bottom: 5px;
+        display: block;
+    }
+
+    .form-actions {
+        display: flex;
+        gap: 10px;
+        justify-content: center;
+    }
+
+    .basket-items {
+        margin-top: 20px;
+    }
+</style>
+
+@code {
+
+
+    private Models.Basket_s BasketData = new Models.Basket_s();
+    private List<Models.Basket_s> BasketItems = new List<Models.Basket_s>();
+    private List<string> BasketItemNames = new List<string>(); // قائمة لحفظ أسماء العناصر فقط
+    private int itemId;
+    private int id_customer;
+    private string tableName;
+    private string Item;
+    private string Description;
+    private decimal Price;
+    private int BasketId;
+
+    public class ApiResponse<T>
+    {
+        public int StatusCode { get; set; }
+        public bool Succeeded { get; set; }
+        public string Message { get; set; }
+        public List<string> Errors { get; set; }
+        public T Data { get; set; }
+    }
+
+ 
+
+    private async Task LoadItemData()
+    {
+        itemId = Convert.ToInt32(await JS.InvokeAsync<string>("sessionStorage.getItem", "itemId"));
+        id_customer = Convert.ToInt32(await JS.InvokeAsync<string>("sessionStorage.getItem", "id_customer"));
+        tableName = await JS.InvokeAsync<string>("sessionStorage.getItem", "TableName");
+        Item = await JS.InvokeAsync<string>("sessionStorage.getItem", "Item");
+        Description = await JS.InvokeAsync<string>("sessionStorage.getItem", "Description");
+        Price = Convert.ToDecimal(await JS.InvokeAsync<string>("sessionStorage.getItem", "Price"));
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadItemData();
+        await LoadBasketFromSession();
+    }
+
+    private async Task LoadBasketFromSession()
+    {
+        var sessionData = await JS.InvokeAsync<string>("sessionStorage.getItem", "BasketItems");
+        var namesData = await JS.InvokeAsync<string>("sessionStorage.getItem", "BasketItemNames");
+        if (!string.IsNullOrEmpty(sessionData))
+        {
+            BasketItems = JsonSerializer.Deserialize<List<Models.Basket_s>>(sessionData);
+        }
+        if (!string.IsNullOrEmpty(namesData))
+        {
+            BasketItemNames = JsonSerializer.Deserialize<List<string>>(namesData);
+        }
+    }
+
+    private async Task AddItemToBasket()
+    {
+        var newItem = new Models.Basket_s
+            {
+                basketId = BasketId,
+                itemId = itemId,
+                quantity = BasketData.quantity,
+                totoal = Price * BasketData.quantity,
+                date = DateTime.Now
+            };
+
+        BasketItems.Add(newItem);
+        BasketItemNames.Add(Item); // إضافة الاسم فقط
+
+        // تحديث `sessionStorage`
+        await JS.InvokeVoidAsync("sessionStorage.setItem", "BasketItems", JsonSerializer.Serialize(BasketItems));
+        await JS.InvokeVoidAsync("sessionStorage.setItem", "BasketItemNames", JsonSerializer.Serialize(BasketItemNames));
+
+        NavigationManager.NavigateTo("/display-images-for-customer", forceLoad: false);
+    }
+
+    private async Task ConfirmBasket()
+    {
+        if (BasketId == 0)
+        {
+            var response = await Http.GetFromJsonAsync<ApiResponse<Models.GetEndRowResponse>>($"https://localhost:7252/Basket/CheckBasketForInsert?customerId={id_customer}");
+            if (response.Data == null)
+            {
+                var createResponse = await Http.PostAsJsonAsync("https://localhost:7252/Basket/Create", new Models.Basket { customerId = id_customer, TableName = tableName });
+                if (createResponse.IsSuccessStatusCode)
+                {
+                    var newBasketResponse = await Http.GetFromJsonAsync<ApiResponse<Models.GetEndRowResponse>>("https://localhost:7252/Basket/GetEndRow");
+                    BasketId = newBasketResponse.Data.Id;
+                }
+            }
+            else
+            {
+                BasketId = response.Data.Id;
+            }
+        }
+
+        foreach (var item in BasketItems)
+        {
+            item.basketId = BasketId;
+            await Http.PostAsJsonAsync("https://localhost:7252/Basket_s/Create", item);
+        }
+
+        await JS.InvokeVoidAsync("sessionStorage.removeItem", "BasketItems");
+        await JS.InvokeVoidAsync("sessionStorage.removeItem", "BasketItemNames"); // حذف قائمة الأسماء
+        BasketItems.Clear();
+        BasketItemNames.Clear();
+
+        NavigationManager.NavigateTo("/ShopsWithImages");
+    }
+
+    private void ResetForm()
+    {
+        BasketData = new Models.Basket_s();
+    }
+}

@@ -1,0 +1,82 @@
+﻿@page "/GenericTableDisplay"
+@inject HttpClient Http
+@inject IJSRuntime JS
+
+<h3>عرض محتوى الجدول</h3>
+
+@if (data == null)
+{
+    <p><em>Loading...</em></p>
+}
+else if (!data.Any())
+{
+    <p>لم يتم العثور على بيانات في الجدول.</p>
+}
+else
+{
+    <table class="table">
+        <thead>
+            <tr>
+                @foreach (var column in columns)
+                {
+                    <th>@column</th>
+                }
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var row in data)
+            {
+                <tr>
+                    @foreach (var column in columns)
+                    {
+                        <td>@row[column]</td>
+                    }
+                </tr>
+            }
+        </tbody>
+    </table>
+}
+
+@code {
+    private List<Dictionary<string, object>> data = new List<Dictionary<string, object>>();
+    private List<string> columns = new List<string>();
+    private string tableName;
+
+    protected override async Task OnInitializedAsync()
+    {
+        // استرجاع اسم الجدول من sessionStorage
+        tableName = await JS.InvokeAsync<string>("sessionStorage.getItem", "tableName");
+
+        if (!string.IsNullOrEmpty(tableName))
+        {
+            await LoadTableData();
+        }
+        else
+        {
+            Console.WriteLine("اسم الجدول غير موجود في sessionStorage.");
+        }
+    }
+
+    private async Task LoadTableData()
+    {
+        try
+        {
+            // افترض أن هناك API يُرجع بيانات الجدول اعتماداً على اسمه
+            var response = await Http.GetFromJsonAsync<List<Dictionary<string, object>>>($"https://localhost:7252/api/Table/GetByName/{tableName}");
+
+            if (response != null)
+            {
+                data = response;
+
+                if (data.Any())
+                {
+                    columns = data[0].Keys.ToList();
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error fetching table data: {ex.Message}");
+        }
+    }
+}

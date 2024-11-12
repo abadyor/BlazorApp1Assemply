@@ -1,0 +1,97 @@
+﻿@page "/Vendor"
+@using System.Net.Http.Json
+@using Microsoft.AspNetCore.Components.Forms
+@inject HttpClient Http
+@inject NavigationManager NavigationManager
+@inject IJSRuntime JS
+
+<h3>إدخال بيانات البائع</h3>
+
+<EditForm Model="vendor" OnValidSubmit="HandleValidSubmit">
+    <DataAnnotationsValidator />
+    <ValidationSummary />
+
+    <div>
+        <label>الأسماء:</label>
+        <InputText @bind-Value="vendor.GivenNames" />
+        <ValidationMessage For="@(() => vendor.GivenNames)" />
+    </div>
+    <div>
+        <label>الكنية:</label>
+        <InputText @bind-Value="vendor.Nickname" />
+        <ValidationMessage For="@(() => vendor.Nickname)" />
+    </div>
+    <div>
+        <label>الجنس:</label>
+        <InputText @bind-Value="vendor.Gender" />
+        <ValidationMessage For="@(() => vendor.Gender)" />
+    </div>
+    <div>
+        <label>رقم الهوية:</label>
+        <InputText @bind-Value="vendor.DocId" />
+        <ValidationMessage For="@(() => vendor.DocId)" />
+    </div>
+    <div>
+        <label>نوع الهوية:</label>
+        <InputText @bind-Value="vendor.DocType" />
+        <ValidationMessage For="@(() => vendor.DocType)" />
+    </div>
+    <div>
+        <label>البريد الإلكتروني:</label>
+        <InputText @bind-Value="vendor.EmailAddress" />
+        <ValidationMessage For="@(() => vendor.EmailAddress)" />
+    </div>
+    <div>
+        <label>رقم الهاتف:</label>
+        <InputText @bind-Value="vendor.Mobile" />
+        <ValidationMessage For="@(() => vendor.Mobile)" />
+    </div>
+    <div>
+        <label>اسم المستخدم:</label>
+        <InputText @bind-Value="vendor.Username" />
+        <ValidationMessage For="@(() => vendor.Username)" />
+    </div>
+    <div>
+        <label>كلمة المرور:</label>
+        <InputText @bind-Value="vendor.Password" type="password" />
+        <ValidationMessage For="@(() => vendor.Password)" />
+    </div>
+    <button type="submit">إرسال</button>
+</EditForm>
+
+@if (!string.IsNullOrEmpty(message))
+{
+    <p>@message</p>
+}
+
+@code {
+    private Models.Vendor vendor = new Models.Vendor();
+    private string message;
+
+    private async Task HandleValidSubmit()
+    {
+        var response = await Http.PostAsJsonAsync("https://localhost:7252/Vendor/Create", vendor);
+        if (response.IsSuccessStatusCode)
+        {
+            await JS.InvokeVoidAsync("sessionStorage.setItem", "username", vendor.Username);
+            await JS.InvokeVoidAsync("sessionStorage.setItem", "password", vendor.Password);
+            // تخزين اسم المستخدم في الجلسة
+            //sessionStorage.SetItem("username", vendor.Username);
+           // sessionStorage.SetItem("password", vendor.Password);
+
+            message = "تم إرسال البيانات بنجاح!";
+            NavigationManager.NavigateTo("/Register");
+        }
+        else
+        {
+            var errorMessage = await response.Content.ReadAsStringAsync();
+            message = $"حدث خطأ أثناء إرسال البيانات: {errorMessage}";
+        }
+    }
+
+    private void ResetForm()
+    {
+        vendor = new Models.Vendor();
+        message = string.Empty;
+    }
+}

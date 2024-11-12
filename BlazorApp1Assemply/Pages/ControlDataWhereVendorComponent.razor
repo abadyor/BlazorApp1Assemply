@@ -1,0 +1,232 @@
+﻿@* @page "/vendor-data/{vendorId:int}"
+@inject HttpClient Http
+@inject NavigationManager NavigationManager
+@using System.Net.Http.Json
+ 
+<h3>Vendor Data</h3>
+
+@if (vendorData == null)
+{
+    <p><em>Loading...</em></p>
+}
+else if (!vendorData.Any())
+{
+    <p>No data found for this vendor.</p>
+}
+else
+{
+    <div class="row">
+        @foreach (var item in vendorData)
+        {
+            <div class="col-md-4 mb-3">
+                <div class="card">
+                    <div class="card-body">
+                        <h5 class="card-title">Shop Name: @item.shopeName</h5>
+                        <p class="card-text"><strong>Address:</strong> @item.Address</p>
+                        <p class="card-text"><strong>Region:</strong> @item.region</p>
+                        <p class="card-text"><strong>City:</strong> @item.city</p>
+                        <p class="card-text"><strong>Street:</strong> @item.Street</p>
+                        <p class="card-text"><strong>Nearest Point:</strong> @item.NerestPoint</p>
+                        <p class="card-text"><strong>Visitor:</strong> @item.visitor</p>
+                        <p class="card-text"><strong>Market Code:</strong> @item.M_Code</p>
+                    </div>
+                </div>
+            </div>
+        }
+    </div>
+}
+<MainPage />
+
+@code {
+    [Parameter]
+    public int VendorId { get; set; }
+
+    private List<Models.GetControlByVendorResponse> vendorData;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadVendorData();
+    }
+
+    private async Task LoadVendorData()
+    {
+        try 
+        {
+            vendorData = await Http.GetFromJsonAsync<List<Models.GetControlByVendorResponse>>($"https://localhost:7252/Control/GetByVendorId/{VendorId}");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error fetching vendor data: {ex.Message}");
+        }
+    }
+}
+ *@
+@*  @page "/vendor-data"
+@inject HttpClient Http
+@inject IJSRuntime JS
+
+<h3>Vendor Data</h3>
+
+@if (vendorData == null)
+{
+    <p><em>Loading...</em></p>
+}
+else if (!vendorData.Any())
+{
+    <p>No data found for this vendor.</p>
+}
+else
+{
+    <div class="row">
+        @foreach (var item in vendorData)
+        {
+            <div class="col-md-4 mb-3">
+                <div class="card">
+                    <div class="card-body">
+                        <h5 class="card-title">Shop Name: @item.shopeName</h5>
+                        <p class="card-text"><strong>Address:</strong> @item.Address</p>
+                    
+                        <p class="card-text"><strong>Street:</strong> @item.Street</p>
+                        <p class="card-text"><strong>Nearest Point:</strong> @item.NerestPoint</p>
+                        <p class="card-text"><strong>Visitor:</strong> @item.visitor</p>
+                     
+                    </div>
+                </div>
+            </div>
+        }
+    </div>
+}
+
+@code {
+    private List<Models.GetControlByVendorResponse> vendorData;
+
+    protected override async Task OnInitializedAsync()
+    {
+        // جلب id_vendor من sessionStorage
+        var vendorIdString = await JS.InvokeAsync<string>("sessionStorage.getItem", "vendorDataId");
+
+        if (int.TryParse(vendorIdString, out var vendorId))
+        {
+            await LoadVendorData(vendorId);
+        }
+        else
+        {
+            Console.WriteLine("Failed to retrieve vendor ID from sessionStorage.");
+        }
+    }
+
+    private async Task LoadVendorData(int vendorId)
+    {
+        try
+        {
+            vendorData = await Http.GetFromJsonAsync<List<Models.GetControlByVendorResponse>>($"https://localhost:7252/Control/GetByVendorId/{vendorId}");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error fetching vendor data: {ex.Message}");
+        }
+    }
+}
+ *@
+
+            @page "/vendor-data"
+@inject HttpClient Http
+@inject IJSRuntime JS
+@inject NavigationManager NavigationManager
+
+<h3>Vendor Data</h3>
+
+@if (vendorData == null)
+{
+    <p><em>Loading...</em></p>
+}
+else if (!vendorData.Any())
+{
+    <p>No data found for this vendor.</p>
+}
+else
+{
+    <div class="row">
+        @foreach (var item in vendorData)
+        {
+            <div class="col-md-4 mb-3">
+                <div class="card">
+                    <div class="card-body">
+                        <h5 class="card-title">Shop Name: @item.shopeName</h5>
+                        <p class="card-text"><strong>Address:</strong> @item.Address</p>
+                        <p class="card-text"><strong>Street:</strong> @item.Street</p>
+                        <p class="card-text"><strong>Nearest Point:</strong> @item.NerestPoint</p>
+                        <p class="card-text"><strong>Visitor:</strong> @item.visitor</p>
+
+                        <!-- زر للانتقال إلى صفحة جديدة -->
+                        <button class="btn btn-primary"
+                                @onclick="() => SaveToSessionAndNavigate(item.M_Code, item.city, item.Last_sore)">
+                            اضافة التفاصيل
+                        </button>
+                        <button class="btn btn-outline-secondary"
+                                @onclick="() => GoToSessionAndNavigate(item.M_Code, item.city, item.Last_sore)">
+                           عرض الاصناف
+                        </button>
+                    </div>
+                </div>
+            </div>
+        }
+    </div>
+}
+
+@code {
+    private List<Models.GetControlByVendorResponse> vendorData;
+
+    protected override async Task OnInitializedAsync()
+    {
+        // جلب id_vendor من sessionStorage
+        var vendorIdString = await JS.InvokeAsync<string>("sessionStorage.getItem", "id_vendor");
+
+        if (int.TryParse(vendorIdString, out var vendorId))
+        {
+            await LoadVendorData(vendorId);
+        }
+        else
+        {
+            Console.WriteLine("Failed to retrieve vendor ID from sessionStorage.");
+        }
+    }
+
+    private async Task LoadVendorData(int vendorId)
+    {
+        try
+        {
+            vendorData = await Http.GetFromJsonAsync<List<Models.GetControlByVendorResponse>>($"https://localhost:7252/Control/GetByVendorId/{vendorId}");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error fetching vendor data: {ex.Message}");
+        }
+    }
+
+    private async Task SaveToSessionAndNavigate(string mCode, string city, string lastStore)
+    {
+        // حفظ القيم في sessionStorage
+      //  await JS.InvokeVoidAsync("sessionStorage.setItem", "mCode", mCode);
+      //  await JS.InvokeVoidAsync("sessionStorage.setItem", "city", city);
+      //  await JS.InvokeVoidAsync("sessionStorage.setItem", "lastStore", lastStore);
+        await JS.InvokeVoidAsync("sessionStorage.setItem", "TableName","s_"+ mCode+city+lastStore);
+
+
+        // إعادة التوجيه إلى صفحة التفاصيل
+        NavigationManager.NavigateTo("/add-dynamic-table");
+    }
+
+    private async Task GoToSessionAndNavigate(string mCode, string city, string lastStore)
+    {
+        // حفظ القيم في sessionStorage
+        //  await JS.InvokeVoidAsync("sessionStorage.setItem", "mCode", mCode);
+        //  await JS.InvokeVoidAsync("sessionStorage.setItem", "city", city);
+        //  await JS.InvokeVoidAsync("sessionStorage.setItem", "lastStore", lastStore);
+        await JS.InvokeVoidAsync("sessionStorage.setItem", "TableName", "s_" + mCode + city + lastStore);
+
+
+        // إعادة التوجيه إلى صفحة التفاصيل
+        NavigationManager.NavigateTo("/display-images");
+    }
+}

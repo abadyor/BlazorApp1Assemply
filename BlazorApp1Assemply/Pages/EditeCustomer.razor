@@ -1,0 +1,122 @@
+﻿@page "/edit-customer/{id:int}"
+@using System.Text.Json
+@inject HttpClient Http
+@inject NavigationManager NavigationManager
+@inject IJSRuntime JS
+
+<h3>تعديل العميل</h3>
+
+@if (customer == null)
+{
+    <p><em>جارٍ التحميل...</em></p>
+}
+else
+{
+    <div>
+        <label>الاسم:</label>
+        <input @bind="customer.GivenNames" class="form-control" />
+    </div>
+    <div>
+        <label>الكنية:</label>
+        <input @bind="customer.Nickname" class="form-control" />
+    </div>
+    <div>
+        <label>الجنس:</label>
+        <input @bind="customer.Gender" class="form-control" />
+    </div>
+    <div>
+        <label>رقم الهوية:</label>
+        <input @bind="customer.DocId" class="form-control" />
+    </div>
+    <div>
+        <label>نوع الهوية:</label>
+        <input @bind="customer.DocType" class="form-control" />
+    </div>
+    <div>
+        <label>البريد الإلكتروني:</label>
+        <input @bind="customer.EmailAddress" type="email" class="form-control" />
+    </div>
+    <div>
+        <label>الهاتف:</label>
+        <input @bind="customer.Mobile" class="form-control" />
+    </div>
+    <div>
+        <label>اسم المستخدم:</label>
+        <input @bind="customer.Username" class="form-control" />
+    </div>
+    <div>
+        <label>كلمة المرور:</label>
+        <input @bind="customer.Password" type="password" class="form-control" />
+    </div>
+    <div>
+        <button class="btn btn-success" @onclick="SaveCustomer">حفظ</button>
+    </div>
+
+    @if (!string.IsNullOrEmpty(errorMessage))
+    {
+        <div class="alert alert-danger">@errorMessage</div>
+    }
+}
+
+@code {
+    [Parameter]
+    public int Id { get; set; }
+
+    private Models.Customer customer;
+    private string errorMessage;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadCustomer();
+    }
+
+    private async Task LoadCustomer()
+    {
+        try
+        {
+            var apiResponse = await Http.GetFromJsonAsync<Models.ApiResponse<Models.Customer>>($"https://localhost:7252/Customer/GetById/{Id}");
+
+            if (apiResponse != null && apiResponse.Succeeded && apiResponse.Data != null)
+            {
+                customer = apiResponse.Data;
+            }
+            else
+            {
+                errorMessage = apiResponse?.Message ?? "فشل في تحميل بيانات العميل.";
+            }
+        }
+        catch (HttpRequestException httpEx)
+        {
+            errorMessage = "خطأ في الاتصال بالخادم: " + httpEx.Message;
+        }
+        catch (JsonException jsonEx)
+        {
+            errorMessage = "خطأ في تحليل البيانات: " + jsonEx.Message;
+        }
+        catch (Exception ex)
+        {
+            errorMessage = "خطأ غير متوقع: " + ex.Message;
+        }
+    }
+
+    private async Task SaveCustomer()
+    {
+        try
+        {
+            customer.Id = Id; // تعيين المعرف من الرابط
+            var response = await Http.PutAsJsonAsync("https://localhost:7252/api/Customer/Customer/Edit", customer);
+            if (response.IsSuccessStatusCode)
+            {
+                NavigationManager.NavigateTo("/customer-list");
+            }
+            else
+            {
+                errorMessage = "فشل في تحديث بيانات العميل.";
+            }
+        }
+        catch (Exception ex)
+        {
+            errorMessage = "خطأ غير متوقع: " + ex.Message;
+        }
+    }
+}

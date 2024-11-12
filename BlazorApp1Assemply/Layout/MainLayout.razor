@@ -1,0 +1,383 @@
+﻿@using System.Text.Json
+@using BlazorApp1Assemply.Models
+@inherits LayoutComponentBase
+@inject HttpClient Http
+@inject IJSRuntime JS
+@inject NavigationManager NavigationManager
+ 
+
+<div class="page">
+    <div class="sidebar">
+        <NavMenu />
+    </div>
+
+    <main>
+        <div class="top-row px-4">
+            <a href="https://learn.microsoft.com/aspnet/core/" target="_blank">About</a>
+            <button class="basket-icon" @onclick="FetchBasketData">
+                🛒
+            </button>
+        </div>
+
+        <article class="content px-4">
+            @Body
+        </article>
+    </main>
+    @if (ShowBasketContent)
+    {
+        @if (id_customer != 0)
+        {
+            <div class="basket-content">
+                <h5>عناصر السلة:</h5>
+
+                @if (BasketItems != null && BasketItems.Any())
+                {
+                    <div>
+                        @foreach (var item in BasketItems)
+                        {
+                            <div class="basket-item">
+                                <div class="basket-item-info">
+                                    <div class="basket-item-name">اسم الصنف: @item.itemName</div>
+                                    <div class="basket-item-price">الكمية: @item.quantity</div>
+                                    <div class="basket-item-price">المجموع: @item.totoal</div>
+                                </div>
+                            </div>
+                        }
+                    </div>
+                    <button class="btn btn-success" @onclick="ConfirmBasket2">تأكيد الحجز</button>
+                }
+                else if (BasketItemNames != null && BasketItemNames.Any())
+                {
+                    <div>
+                        <h5>عناصر السلة:</h5>
+                        <div>
+                            @for (int i = 0; i < BasketItemsInList.Count; i++)
+                            {
+                                <div class="basket-item">
+                                    <div class="basket-item-info">
+                                        <div class="basket-item-name">اسم الصنف: @BasketItemNames[i]</div>
+                                        <div class="basket-item-price">الكمية: @BasketItemsInList[i].quantity</div>
+                                        <div class="basket-item-price">الإجمالي: @BasketItemsInList[i].totoal</div>
+                                    </div>
+                                </div>
+                            }
+                        </div>
+                        <button class="btn btn-success" @onclick="ConfirmBasket">تأكيد الحجز</button>
+                    </div>
+                }
+            </div>
+        }
+    }
+
+  
+</div>
+
+@code {
+
+
+
+    private List<GetBasket_sByBasketIdResponse> BasketItems = new List<GetBasket_sByBasketIdResponse>();
+    private List<Basket_s> BasketItemsInList = new List<Basket_s>();
+    private List<string> BasketItemNames = new List<string>();
+    private bool ShowBasketContent = false;
+    private int id_customer;
+    private int BasketId;
+    private string tableName;
+    private bool ShowButtonAddBasket;
+
+    public class ApiResponse<T>
+    {
+        public int StatusCode { get; set; }
+        public bool Succeeded { get; set; }
+        public string Message { get; set; }
+        public T Data { get; set; }
+    }
+
+    private async Task ConfirmBasket2()
+    {
+        if (BasketId == 0)
+        {
+            var response = await Http.GetFromJsonAsync<ApiResponse<GetEndRowResponse>>($"https://localhost:7252/Basket/CheckBasketForInsert?customerId={id_customer}");
+            if (response.Data == null)
+            {
+                var createResponse = await Http.PostAsJsonAsync("https://localhost:7252/Basket/Create", new Basket { customerId = id_customer, TableName = tableName });
+                if (createResponse.IsSuccessStatusCode)
+                {
+                    var newBasketResponse = await Http.GetFromJsonAsync<ApiResponse<GetEndRowResponse>>("https://localhost:7252/Basket/GetEndRow");
+                    BasketId = newBasketResponse.Data.Id;
+                }
+            }
+            else
+            {
+                BasketId = response.Data.Id;
+            }
+        }
+
+
+        var sendEmail = await Http.PostAsJsonAsync("https://localhost:7252/Basket/SendEmail", new SendEmail { customerId = id_customer, BasketId = BasketId });
+        if (sendEmail.IsSuccessStatusCode)
+        {
+
+
+            await JS.InvokeVoidAsync("sessionStorage.removeItem", "BasketItems");
+            await JS.InvokeVoidAsync("sessionStorage.removeItem", "BasketItemNames"); // حذف قائمة الأسماء
+            BasketItems.Clear();
+            BasketItemNames.Clear();
+            Console.WriteLine("Yes Send Email");
+            await JS.InvokeVoidAsync("sessionStorage.setItem", "BasketId", BasketId);
+            BasketId = 0;
+            NavigationManager.NavigateTo("/CodeLogForBasket");
+
+        }
+        else
+        {
+            Console.WriteLine("no Send Email");
+        }
+    }
+
+    private async Task ConfirmBasket()
+    {
+        if (BasketId == 0)
+        {
+            var response = await Http.GetFromJsonAsync<ApiResponse<GetEndRowResponse>>($"https://localhost:7252/Basket/CheckBasketForInsert?customerId={id_customer}");
+            if (response.Data == null)
+            {
+                var createResponse = await Http.PostAsJsonAsync("https://localhost:7252/Basket/Create", new Basket { customerId = id_customer, TableName = tableName });
+                if (createResponse.IsSuccessStatusCode)
+                {
+                    var newBasketResponse = await Http.GetFromJsonAsync<ApiResponse<GetEndRowResponse>>("https://localhost:7252/Basket/GetEndRow");
+                    BasketId = newBasketResponse.Data.Id;
+                }
+            }
+            else
+            {
+                BasketId = response.Data.Id;
+            }
+        }
+
+        foreach (var item in BasketItemsInList)
+        {
+            item.basketId = BasketId;
+
+            await Http.PostAsJsonAsync("https://localhost:7252/Basket_s/Create", item);
+        }
+        var sendEmail = await Http.PostAsJsonAsync("https://localhost:7252/Basket/SendEmail", new SendEmail { customerId = id_customer, BasketId = BasketId });
+        if (sendEmail.IsSuccessStatusCode)
+        {
+
+
+            await JS.InvokeVoidAsync("sessionStorage.removeItem", "BasketItems");
+            await JS.InvokeVoidAsync("sessionStorage.removeItem", "BasketItemNames"); // حذف قائمة الأسماء
+            BasketItems.Clear();
+            BasketItemNames.Clear();
+            Console.WriteLine("Yes Send Email");
+            await JS.InvokeVoidAsync("sessionStorage.setItem", "BasketId", BasketId);
+            BasketId = 0;
+            NavigationManager.NavigateTo("/CodeLogForBasket");
+
+        }
+        else
+        {
+            Console.WriteLine("no Send Email");
+        }
+    }
+  
+
+    private async Task FetchBasketData()
+    {
+        id_customer = Convert.ToInt32(await JS.InvokeAsync<string>("sessionStorage.getItem", "id_customer"));
+        if (id_customer != 0)
+        {
+            ShowBasketContent = !ShowBasketContent;
+
+            if (ShowBasketContent)
+            {
+                try
+                {
+
+                    var responseBasket = await Http.GetFromJsonAsync<ApiResponse<GetEndRowResponse>>($"https://localhost:7252/Basket/CheckBasketForInsert?customerId={id_customer}");
+                    if (responseBasket.Data == null)
+                    {
+                        await LoadBasketFromSession();
+                    }
+                    else
+                    {
+
+
+
+
+
+                        var response = await Http.GetFromJsonAsync<ApiResponse<JsonElement>>($"https://localhost:7252/Basket_s/GetBasketByCustomerId?customerId={id_customer}");
+                        if (response != null && response.Succeeded)
+                        {
+                            if (response.Data.ValueKind == JsonValueKind.Array)
+                            {
+                                var basketList = JsonSerializer.Deserialize<List<GetBasket_sByBasketIdResponse>>(response.Data.GetRawText());
+                                BasketItems = basketList ?? new List<GetBasket_sByBasketIdResponse>();
+                               
+                                foreach (var item in BasketItems)
+                                {
+                                    var newItem = new Models.Basket_s
+                                        {
+                                            basketId = item.basketId,
+                                            itemId = item.itemId,
+                                            quantity = item.quantity,
+                                            totoal = item.totoal,
+
+                                        };
+                                    BasketItemsInList.Add(newItem);
+                                    BasketItemNames.Add(item.itemName);
+
+                                }
+                                await JS.InvokeVoidAsync("sessionStorage.setItem", "BasketItems", JsonSerializer.Serialize(BasketItemsInList));
+                                await JS.InvokeVoidAsync("sessionStorage.setItem", "BasketItemNames", JsonSerializer.Serialize(BasketItemNames));
+                               
+                               
+                            }
+                            else if (response.Data.ValueKind == JsonValueKind.Object)
+                            {
+                                var singleBasketItem = JsonSerializer.Deserialize<GetBasket_sByBasketIdResponse>(response.Data.GetRawText());
+                                if (singleBasketItem != null)
+                                {
+                                    BasketItems = new List<GetBasket_sByBasketIdResponse> { singleBasketItem };
+                                
+                                    foreach (var item in BasketItems)
+                                    {
+                                        var newItem = new Models.Basket_s
+                                            {
+                                                basketId = item.basketId,
+                                                itemId = item.itemId,
+                                                quantity = item.quantity,
+                                                totoal = item.totoal,
+
+                                            };
+                                        BasketItemsInList.Add(newItem);
+                                        BasketItemNames.Add(item.itemName);
+
+                                    }
+
+                                    await JS.InvokeVoidAsync("sessionStorage.setItem", "BasketItems", JsonSerializer.Serialize(BasketItemsInList));
+                                    await JS.InvokeVoidAsync("sessionStorage.setItem", "BasketItemNames", JsonSerializer.Serialize(BasketItemNames));
+                                   
+                                }
+                            }
+                        }
+                       // else
+                      // {
+                            // في حال لم يتم العثور على السلة في API، تحميل البيانات من الجلسة
+                        //    await LoadBasketFromSession();
+                       // }
+
+                    }
+                }
+                catch (HttpRequestException ex) when (ex.StatusCode == System.Net.HttpStatusCode.NotFound)
+                {
+                    await LoadBasketFromSession();
+                }
+            }
+        }
+    }
+
+    private async Task LoadBasketFromSession()
+    {
+        var sessionData = await JS.InvokeAsync<string>("sessionStorage.getItem", "BasketItems");
+        var namesData = await JS.InvokeAsync<string>("sessionStorage.getItem", "BasketItemNames");
+
+        tableName = await JS.InvokeAsync<string>("sessionStorage.getItem", "TableName");
+        if (!string.IsNullOrEmpty(sessionData))
+        {
+            BasketItemsInList = JsonSerializer.Deserialize<List<Basket_s>>(sessionData);
+        }
+        if (!string.IsNullOrEmpty(namesData))
+        {
+            BasketItemNames = JsonSerializer.Deserialize<List<string>>(namesData);
+        }
+    }
+}
+
+<style>
+    .basket-icon {
+        position: fixed;
+        top: 0px;
+        right: 80px;
+        background-color: #ff9800;
+        border: none;
+        padding: 10px;
+        border-radius: 50%;
+        font-size: 24px;
+        cursor: pointer;
+        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+        z-index: 1000;
+    }
+
+    .basket-content {
+        position: fixed;
+        top: 60px;
+        right: 20px;
+        width: 280px;
+        background-color: #ffffff;
+        border-radius: 12px;
+        padding: 15px;
+        box-shadow: 0 8px 16px rgba(0, 0, 0, 0.2);
+        z-index: 999;
+        max-height: 400px;
+        overflow-y: auto;
+        font-family: Arial, sans-serif;
+    }
+
+        .basket-content h5 {
+            font-size: 1.2em;
+            font-weight: bold;
+            color: #333;
+            margin-bottom: 12px;
+        }
+
+    .basket-item {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 10px;
+        border-bottom: 1px solid #f1f1f1;
+    }
+
+        .basket-item:last-child {
+            border-bottom: none;
+        }
+
+        .basket-item img {
+            width: 50px;
+            height: 50px;
+            border-radius: 8px;
+            margin-right: 10px;
+        }
+
+    .basket-item-info {
+        flex-grow: 1;
+    }
+
+    .basket-item-name {
+        font-size: 1em;
+        color: #555;
+    }
+
+    .basket-item-price {
+        font-size: 0.9em;
+        color: #777;
+    }
+
+    .basket-item button {
+        background-color: #ff9800;
+        color: #fff;
+        border: none;
+        border-radius: 5px;
+        padding: 5px 10px;
+        font-size: 0.9em;
+        cursor: pointer;
+        transition: background-color 0.3s ease;
+    }
+
+        .basket-item button:hover {
+            background-color: #e68a00;
+        }
+
+</style>

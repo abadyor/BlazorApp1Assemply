@@ -1,0 +1,57 @@
+﻿@page "/MainPage"
+@using Microsoft.AspNetCore.Components.Web
+@inject NavigationManager NavigationManager
+
+<h1>مرحبًا بك في صفحتنا!</h1>
+<p>اختر أحد الخيارات التالية:</p>
+
+<div class="button-container">
+    <button class="button" @onclick="OnButton1Click">  إضافة محل</button>
+    <button class="button secondary" @onclick="OnButton2Click">زر 2</button>
+</div>
+
+<style>
+    .button-container {
+        display: flex;
+        justify-content: center;
+        margin-top: 20px;
+    }
+
+    .button {
+        background-color: #007bff;
+        color: white;
+        border: none;
+        border-radius: 5px;
+        padding: 15px 30px;
+        margin: 10px;
+        cursor: pointer;
+        font-size: 16px;
+        transition: background-color 0.3s;
+    }
+
+        .button:hover {
+            background-color: #0056b3;
+        }
+
+        .button.secondary {
+            background-color: #28a745;
+        }
+
+            .button.secondary:hover {
+                background-color: #218838;
+            }
+</style>
+
+@code {
+    private void OnButton1Click()
+    {
+        // هنا يمكنك إضافة منطق الزر الأول
+        NavigationManager.NavigateTo("/ControleTable");
+    }
+
+    private void OnButton2Click()
+    {
+        // هنا يمكنك إضافة منطق الزر الثاني
+        NavigationManager.NavigateTo("/page2");  
+    }
+}

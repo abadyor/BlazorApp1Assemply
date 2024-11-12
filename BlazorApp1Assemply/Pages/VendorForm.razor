@@ -1,0 +1,217 @@
+﻿  
+@* @page "/VendorForm"
+@using System.Text.Json
+@inject HttpClient Http
+
+<h3>إدخال بيانات البائع</h3>
+
+ 
+    <EditForm Model="vendor" OnValidSubmit="HandleValidSubmit" FormName="VendorForm">
+     
+    <DataAnnotationsValidator />
+    <ValidationSummary />
+
+    <div>
+        <label>الأسماء:</label>
+        <InputText @bind-Value="vendor.GivenNames" id="GivenNames"/>
+        <ValidationMessage For="@(() => vendor.GivenNames)" />
+    </div>
+    <div>
+        <label>الكنية:</label>
+        <InputText @bind-Value="vendor.Nickname" id="Nickname" />
+        <ValidationMessage For="@(() => vendor.Nickname)" />
+    </div>
+    <div>
+        <label>اسم المتجر:</label>
+        <InputText @bind-Value="vendor.ShopeName" id="ShopeName" />
+        <ValidationMessage For="@(() => vendor.ShopeName)" />
+    </div>
+    <div>
+        <label>الجنس:</label>
+        <InputText @bind-Value="vendor.Gender" id="Gender" />
+        <ValidationMessage For="@(() => vendor.Gender)" />
+    </div>
+    <div>
+        <label>رقم الهوية:</label>
+        <InputText @bind-Value="vendor.DocId" id="DocId" />
+        <ValidationMessage For="@(() => vendor.DocId)" />
+    </div>
+    <div>
+        <label>نوع الهوية:</label>
+        <InputText @bind-Value="vendor.DocType" id="DocType" />
+        <ValidationMessage For="@(() => vendor.DocType)" />
+    </div>
+    <div>
+        <label>البريد الإلكتروني:</label>
+        <InputText @bind-Value="vendor.EmailAddress" id="EmailAddress" />
+        <ValidationMessage For="@(() => vendor.EmailAddress)" />
+    </div>
+    <div>
+        <label>رقم الهاتف:</label>
+        <InputText @bind-Value="vendor.Mobile" id="Mobile" />
+        <ValidationMessage For="@(() => vendor.Mobile)" />
+    </div>
+    <div>
+        <label>المدينة:</label>
+        <InputSelect @bind-Value="vendor.City" id="City">
+            <option value="">اختر مدينة</option>
+            @foreach (var city in Cities)
+            {
+                <option value="@city.Code">@city.Name</option>
+            }
+        </InputSelect>
+        <ValidationMessage For="@(() => vendor.City)" />
+    </div>
+    <div>
+        <label>الشارع:</label>
+        <InputText @bind-Value="vendor.Street" id="Street" />
+        <ValidationMessage For="@(() => vendor.Street)" />
+    </div>
+    <div>
+        <label>أقرب نقطة:</label>
+        <InputText @bind-Value="vendor.NerestPoint"   id="NerestPoint"/>
+        <ValidationMessage For="@(() => vendor.NerestPoint)" />
+    </div>
+    <div>
+        <label>اسم المستخدم:</label>
+        <InputText @bind-Value="vendor.Username" id="Username" />
+        <ValidationMessage For="@(() => vendor.Username)" />
+    </div>
+    <div>
+        <label>كلمة المرور:</label>
+        <InputText @bind-Value="vendor.Password" type="password" id="password" />
+        <ValidationMessage For="@(() => vendor.Password)" />
+    </div>
+    <div>
+        <label>كود السوق:</label>
+        <InputSelect @bind-Value="vendor.MarketCode" id="MarketCode">
+            <option value="">اختر كود السوق</option>
+            @foreach (var market in markets)
+            {
+                <option value="@market.Code">@market.Name</option>
+            }
+        </InputSelect>
+        <ValidationMessage For="@(() => vendor.MarketCode)" />
+    </div>
+    <div>
+        <label>كود المنطقة:</label>
+        <InputSelect @bind-Value="vendor.RegionCode" id="RegionCode">
+            <option value="">اختر كود المنطقة</option>
+            @foreach (var region in regions)
+            {
+                <option value="@region.Code">@region.Name</option>
+            }
+        </InputSelect>
+        <ValidationMessage For="@(() => vendor.RegionCode)" />
+    </div>
+    <button type="submit">إرسال</button>
+</EditForm>
+
+@if (!string.IsNullOrEmpty(message))
+{
+    <p>@message</p>
+}
+
+@code {
+    private Models.Vendor vendor = new ();
+    private List<Models.GetMarket> markets = new List<Models.GetMarket>();
+    private List<Models.GetRegion> regions = new List<Models.GetRegion>();
+    private List<Models.GetCities> Cities = new List<Models.GetCities>();
+    private string message;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            var marketsResponse = await Http.GetFromJsonAsync<List<Models.GetMarket>>("https://localhost:7252/Vendor/markets");
+            if (marketsResponse != null)
+            {
+                markets = marketsResponse;
+                Console.WriteLine("Markets fetched successfully.");
+            }
+            else
+            {
+                Console.WriteLine("Markets response is null.");
+                message = "فشل في جلب بيانات الأسواق: البيانات غير موجودة";
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error fetching markets: {ex.Message}");
+            message = $"فشل في جلب بيانات الأسواق: {ex.Message}";
+        }
+
+        try
+        {
+            var regionsResponse = await Http.GetFromJsonAsync<List<Models.GetRegion>>("https://localhost:7252/Vendor/Regin");
+            if (regionsResponse != null)
+            {
+                regions = regionsResponse;
+                Console.WriteLine("Regions fetched successfully.");
+            }
+            else
+            {
+                Console.WriteLine("Regions response is null.");
+                message = "فشل في جلب بيانات المناطق: البيانات غير موجودة";
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error fetching regions: {ex.Message}");
+            message = $"فشل في جلب بيانات المناطق: {ex.Message}";
+        }
+
+        try
+        {
+            var CityResponse = await Http.GetFromJsonAsync<List<Models.GetCities>>("https://localhost:7252/Vendor/City");
+            if (CityResponse != null)
+            {
+                Cities = CityResponse;
+                Console.WriteLine("Regions fetched successfully.");
+            }
+            else
+            {
+                Console.WriteLine("Regions response is null.");
+                message = "فشل في جلب بيانات المدن: البيانات غير موجودة";
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error fetching regions: {ex.Message}");
+            message = $"فشل في جلب بيانات المناطق: {ex.Message}";
+        }
+    }
+
+
+    private async Task HandleValidSubmit()
+    {
+        if (string.IsNullOrEmpty(vendor.GivenNames))
+        {
+            Console.WriteLine("GivenNames is empty");
+        }
+        if (string.IsNullOrEmpty(vendor.Nickname))
+        {
+            Console.WriteLine("Nickname is empty");
+        }
+        Console.WriteLine("Submitting form with data: " + JsonSerializer.Serialize(vendor)); // Debugging line
+        var response = await Http.PostAsJsonAsync("https://localhost:7252/Vendor/Create", vendor);
+        if (response.IsSuccessStatusCode)
+        {
+            message = "تم إرسال البيانات بنجاح!";
+            ResetForm();
+        }
+        else
+        {
+            var errorMessage = await response.Content.ReadAsStringAsync();
+            message = $"حدث خطأ أثناء إرسال البيانات: {errorMessage}";
+        }
+    }
+
+    private void ResetForm()
+    {
+        vendor = new Models.Vendor();
+        message = string.Empty;
+    }
+}
+
+ *@

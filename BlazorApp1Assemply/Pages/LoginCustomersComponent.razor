@@ -1,0 +1,143 @@
+﻿@page "/LoginCustomer"
+@using System.Text.Json
+@using System.Net.Http.Json
+@inject HttpClient Http
+@inject NavigationManager NavigationManager
+@inject IJSRuntime JS
+
+
+<h3>إدخال نص</h3>
+
+<div class="input-container">
+    <EditForm Model="inputLogin" OnValidSubmit="HandleValidSubmit">
+        <DataAnnotationsValidator />
+        <ValidationSummary />
+
+        <div class="form-group">
+            <label for="inputText">أدخل  nameUser:</label>
+            <InputText id="inputText" @bind-Value="inputLogin.username" class="form-control" />
+            <ValidationMessage For="@(() => inputLogin.username)" />
+        </div>
+
+        <div class="form-group">
+            <label for="inputText">أدخل Password :</label>
+            <InputText id="inputText" @bind-Value="inputLogin.password" class="form-control" />
+            <ValidationMessage For="@(() => inputLogin.password)" />
+        </div>
+
+        <button type="submit" class="btn btn-primary">إرسال</button>
+    </EditForm>
+
+    @if (!string.IsNullOrEmpty(message))
+    {
+        <p class="message">@message</p>
+    }
+</div>
+
+<style>
+    .input-container {
+        max-width: 400px;
+        margin: auto;
+        padding: 20px;
+        border: 1px solid #ccc;
+        border-radius: 5px;
+        box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        background-color: #f9f9f9;
+    }
+
+    .form-group {
+        margin-bottom: 15px;
+    }
+
+    .form-control {
+        width: 100%;
+        padding: 10px;
+        border: 1px solid #007bff;
+        border-radius: 5px;
+        outline: none;
+    }
+
+        .form-control:focus {
+            border-color: #0056b3;
+        }
+
+    .btn {
+        padding: 10px 15px;
+        background-color: #007bff;
+        color: white;
+        border: none;
+        border-radius: 5px;
+        cursor: pointer;
+    }
+
+        .btn:hover {
+            background-color: #0056b3;
+        }
+
+    .message {
+        margin-top: 15px;
+        color: green;
+        font-weight: bold;
+    }
+</style>
+@code
+{
+    private Models.LoginCustomer inputLogin = new Models.LoginCustomer();
+    private string message;
+    private string username;
+    private int id_customer;
+    private string password;
+    private bool ShowButtonAddBasket;
+
+
+
+    public class ApiResponse<T>
+    {
+        public int StatusCode { get; set; }
+        public bool Succeeded { get; set; }
+        public string Message { get; set; }
+        public T Data { get; set; }
+    }
+
+
+    protected override async Task OnInitializedAsync()
+    {
+        username = await JS.InvokeAsync<string>("sessionStorage.getItem", "username");
+        password = await JS.InvokeAsync<string>("sessionStorage.getItem", "password");
+    }
+
+    private async Task HandleValidSubmit()
+    {
+
+
+        // إرسال البيانات إلى API
+        var response = await Http.PostAsJsonAsync("https://localhost:7252/Customer/Login", inputLogin);
+        if (response.IsSuccessStatusCode)
+        {
+            var responseData = await response.Content.ReadFromJsonAsync<Models.CheckUserByLogResponse>();
+            id_customer = responseData.Id; // استلام id
+            await JS.InvokeVoidAsync("sessionStorage.setItem", "id_customer", id_customer);
+            message = "تم إرسال النص بنجاح!";
+            
+           
+           
+
+            ResetForm();
+
+            NavigationManager.NavigateTo("/ShopsWithImages"); // استبدل "/NextPage" بالمسار الصحيح
+        }
+        else
+        {
+            message = "حدث خطأ أثناء إرسال النص.";
+        }
+    }
+
+    private void ResetForm()
+    {
+        inputLogin = new Models.LoginCustomer();
+        message = string.Empty;
+    }
+
+
+}
+

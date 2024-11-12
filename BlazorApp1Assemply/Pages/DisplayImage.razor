@@ -1,0 +1,2360 @@
+﻿@* 
+    @page "/display-images"
+ 
+@inject HttpClient Http
+@inject IJSRuntime JS
+@inject NavigationManager NavigationManager
+
+<h3>معرض الصور</h3>
+
+@if (imageDataList != null && imageDataList.Count > 0)
+{
+    <div class="row">
+        @foreach (var imageData in imageDataList)
+        {
+            <div class="col-md-4">
+                <div class="card mb-4">
+                    <img src="@($"https://localhost:7252/{imageData.ImageName}")" class="card-img-top" alt="صورة @imageData.Item" />
+                    <div class="card-body">
+                        <h5 class="card-title">@imageData.Item</h5>
+                        <p class="card-text">الوصف: @imageData.Description</p>
+                        <p class="card-text">السعر: @imageData.Price</p>
+                        <p class="card-text">الكمية: @imageData.Quantity</p>
+                    </div>
+                </div>
+            </div>
+        }
+    </div>
+}
+else
+{
+    <p>لا توجد صور لعرضها.</p>
+}
+
+@code {
+    private List<Models.GetImageResponse> imageDataList;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var tableName = await JS.InvokeAsync<string>("sessionStorage.getItem", "TableName");
+        if (!string.IsNullOrEmpty(tableName))
+        {
+            try
+            {
+                imageDataList = await Http.GetFromJsonAsync<List<Models.GetImageResponse>>($"https://localhost:7252/Control/GetImages?tableName={tableName}");
+            }
+            catch (HttpRequestException ex)
+            {
+                // Log or handle the exception as needed
+                Console.WriteLine($"Request error: {ex.Message}");
+            }
+
+        }
+    }
+}
+ *@
+
+@* @page "/display-images"
+@using Microsoft.AspNetCore.Components.Forms
+@inject HttpClient Http
+@inject IJSRuntime JS
+@inject NavigationManager NavigationManager
+
+<h3>معرض الصور</h3>
+
+@if (imageDataList != null && imageDataList.Count > 0)
+{
+    <div class="row">
+        @foreach (var imageData in imageDataList)
+        {
+            <div class="col-md-4">
+                <div class="card mb-4">
+                    <img src="@($"https://localhost:7252/{imageData.ImageName}")" class="card-img-top" alt="صورة @imageData.Item" />
+                    <div class="card-body">
+                        <h5 class="card-title">@imageData.Item</h5>
+                        <p class="card-text">الوصف: @imageData.Description</p>
+                        <p class="card-text">السعر: @imageData.Price</p>
+                        <p class="card-text">الكمية: @imageData.Quantity</p>
+                        <button class="btn btn-primary" @onclick="() => EditImage(imageData)">تعديل</button>
+                    </div>
+                </div>
+            </div>
+        }
+    </div>
+
+    @if (isEditModalVisible)
+    {
+        <div class="modal show d-block" tabindex="-1">
+            <div class="modal-dialog">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title">تعديل المنتج</h5>
+                        <button type="button" class="btn-close" @onclick="CloseEditModal"></button>
+                    </div>
+                    <div class="modal-body">
+                        <InputFile OnChange="OnFileChange" class="form-control" />
+                        <input type="number" class="form-control mt-2" @bind="editImageData.Price" placeholder="تحديث السعر" />
+                        <input type="text" class="form-control mt-2" @bind="editImageData.Description" placeholder="تحديث الوصف" />
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" @onclick="CloseEditModal">إلغاء</button>
+                        <button type="button" class="btn btn-primary" @onclick="UpdateImage">حفظ التغييرات</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    }
+}
+else
+{
+    <p>لا توجد صور لعرضها.</p>
+}
+
+@code {
+    private List<Models.GetImageResponse> imageDataList;
+    private Models.GetImageResponse editImageData = new Models.GetImageResponse();
+    private bool isEditModalVisible = false;
+    private string uploadedImagePath;
+    public string tablenames;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var tableName = await JS.InvokeAsync<string>("sessionStorage.getItem", "TableName");
+        tablenames = tableName;
+        editImageData.TableName = tableName;
+        if (!string.IsNullOrEmpty(tableName))
+        {
+            try
+            {
+                imageDataList = await Http.GetFromJsonAsync<List<Models.GetImageResponse>>($"https://localhost:7252/Control/GetImages?tableName={tableName}");
+            }
+            catch (HttpRequestException ex)
+            {
+                Console.WriteLine($"Request error: {ex.Message}");
+            }
+        }
+    }
+
+    private void EditImage(Models.GetImageResponse imageData)
+    {
+        editImageData = imageData;
+        isEditModalVisible = true;
+    }
+
+    private void CloseEditModal()
+    {
+        isEditModalVisible = false;
+    }
+
+    private async Task OnFileChange(InputFileChangeEventArgs e)
+    {
+        var file = e.File;
+        if (file != null)
+        {
+            var content = new MultipartFormDataContent();
+            content.Add(new StreamContent(file.OpenReadStream()), "file", file.Name);
+
+            var response = await Http.PostAsync("https://localhost:7252/Control/UploadImage", content);
+
+            if (response.IsSuccessStatusCode)
+            {
+                uploadedImagePath = await response.Content.ReadAsStringAsync();
+
+                // تأكد من إزالة أي مسارات إضافية
+                uploadedImagePath = uploadedImagePath.TrimStart('/'); // إزالة أي شرطة مائلة زائدة في البداية
+
+                // تأكد من أن المسار الصحيح يتم تعيينه
+                editImageData.ImageName = uploadedImagePath;
+            }
+            else
+            {
+                Console.WriteLine("فشل في تحميل الصورة");
+            }
+        }
+    }
+
+
+    private async Task UpdateImage()
+    {
+        if (!string.IsNullOrEmpty(uploadedImagePath))
+        {
+            // استخراج اسم الملف فقط بدون المسار
+            var imageName = Path.GetFileName(uploadedImagePath);
+            editImageData.ImageName = imageName;
+            editImageData.TableName = tablenames;
+        }
+
+        var response = await Http.PutAsJsonAsync($"https://localhost:7252/Control/UpdateImage?tableName={tablenames}", editImageData);
+
+        if (response.IsSuccessStatusCode)
+        {
+            isEditModalVisible = false;
+            await OnInitializedAsync(); // إعادة تحميل البيانات
+        }
+        else
+        {
+            Console.WriteLine("فشل في تحديث بيانات الصورة");
+        }
+    }
+}
+ *@
+
+      @*       @page "/display-images"
+@using Microsoft.AspNetCore.Components.Forms
+@using System.Net.Http.Headers
+@inject HttpClient Http
+@inject IJSRuntime JS
+@inject NavigationManager NavigationManager
+
+<h3>معرض الصور</h3>
+
+@if (imageDataList != null && imageDataList.Count > 0)
+{
+    <div class="row">
+        @foreach (var imageData in imageDataList)
+        {
+            <div class="col-md-4">
+                <div class="card mb-4">
+                    <img src="@($"https://localhost:7252/{imageData.ImageName}")" class="card-img-top" alt="صورة @imageData.Item" />
+                    <div class="card-body">
+                        <h5 class="card-title">@imageData.Item</h5>
+                        <p class="card-text">الوصف: @imageData.Description</p>
+                        <p class="card-text">السعر: @imageData.Price</p>
+                        <p class="card-text">الكمية: @imageData.Quantity</p>
+                        <button class="btn btn-primary" @onclick="() => EditImage(imageData)">تعديل</button>
+                    </div>
+                </div>
+            </div>
+        }
+    </div>
+
+    @if (isEditModalVisible)
+    {
+        <div class="modal show d-block" tabindex="-1">
+            <div class="modal-dialog">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title">تعديل المنتج</h5>
+                        <button type="button" class="btn-close" @onclick="CloseEditModal"></button>
+                    </div>
+                    <div class="modal-body">
+                        <InputFile OnChange="OnInputFileChange" class="form-control" />
+                        <input type="number" class="form-control mt-2" @bind="editImageData.Price" placeholder="تحديث السعر" />
+                        <input type="text" class="form-control mt-2" @bind="editImageData.Description" placeholder="تحديث الوصف" />
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" @onclick="CloseEditModal">إلغاء</button>
+                        <button type="button" class="btn btn-primary" @onclick="() => UploadImage()">حفظ التغييرات</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    }
+}
+else
+{
+    <p>لا توجد صور لعرضها.</p>
+}
+
+@code {
+    private List<Models.GetImageResponse> imageDataList;
+    private Models.GetImageResponse editImageData = new Models.GetImageResponse();
+    private bool isEditModalVisible = false;
+    private string uploadedImagePath;
+    public string tablenames;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var tableName = await JS.InvokeAsync<string>("sessionStorage.getItem", "TableName");
+        tablenames = tableName;
+        editImageData.TableName = tableName;
+        if (!string.IsNullOrEmpty(tableName))
+        {
+            try
+            {
+                imageDataList = await Http.GetFromJsonAsync<List<Models.GetImageResponse>>($"https://localhost:7252/Control/GetImages?tableName={tableName}");
+            }
+            catch (HttpRequestException ex)
+            {
+                Console.WriteLine($"Request error: {ex.Message}");
+            }
+        }
+    }
+
+    private void EditImage(Models.GetImageResponse imageData)
+    {
+        editImageData = imageData;
+        isEditModalVisible = true;
+    }
+
+    private void CloseEditModal()
+    {
+        isEditModalVisible = false;
+    }
+
+    /*
+    private async Task OnFileChange(InputFileChangeEventArgs e)
+    {
+        var file = e.File;
+        if (file != null)
+        {
+            var content = new MultipartFormDataContent();
+            using (var stream = new MemoryStream())
+            {
+                await file.OpenReadStream().CopyToAsync(stream);
+                var fileContent = new ByteArrayContent(stream.ToArray());
+                fileContent.Headers.ContentType = new MediaTypeHeaderValue(file.ContentType);
+                content.Add(fileContent, "file", file.Name);
+            }
+
+            var response = await Http.PostAsync("https://localhost:7252/Control/UploadImage", content);
+
+            if (response.IsSuccessStatusCode)
+            {
+                uploadedImagePath = await response.Content.ReadAsStringAsync(); // تخزين اسم الصورة الجديدة
+            }
+            else
+            {
+                Console.WriteLine("فشل في تحميل الصورة");
+            }
+        }
+    }
+    */
+
+    private async Task OnInputFileChange(InputFileChangeEventArgs e)
+    {
+        var file = e.GetMultipleFiles(1).FirstOrDefault();
+        if (file != null)
+        {
+            // تحديد مسار المجلد
+            var directoryPath = Path.Combine($"uploads/{tablenames}", tablenames);
+
+            // تأكد من وجود المجلد، وإذا لم يكن موجودًا، قم بإنشائه
+            if (!Directory.Exists(directoryPath))
+            {
+                Directory.CreateDirectory(directoryPath);
+            }
+
+            // تحديد مسار الصورة
+            var filePath = Path.Combine(directoryPath, file.Name);
+
+            // حفظ الصورة في المسار المحدد
+            using var stream = new FileStream(filePath, FileMode.Create);
+            await file.OpenReadStream().CopyToAsync(stream);
+
+            uploadedImagePath = filePath; // تحديث المسار الخاص بالصورة
+
+            // رفع الصورة بعد حفظها
+            await UploadImage(filePath); // تمرير المسار الجديد
+        }
+    }
+
+
+    private async Task UploadImage(string uploadedImagePath = null)
+    {
+        if (string.IsNullOrEmpty(uploadedImagePath))
+        {
+            uploadedImagePath = this.uploadedImagePath; // استخدام المسار الحالي
+        }
+
+        if (!string.IsNullOrEmpty(uploadedImagePath))
+        {
+            using var stream = new FileStream(uploadedImagePath, FileMode.Open);
+            using var content = new MultipartFormDataContent();
+
+            // إضافة حقل folder
+            content.Add(new StringContent("uplods"), "folder"); // استبدل "your_folder_name_here" باسم المجلد الفعلي
+
+            content.Add(new StreamContent(stream), "file", Path.GetFileName(uploadedImagePath));
+
+            var response = await Http.PostAsync("https://localhost:7252/Control/UploadImage", content);
+
+            if (response.IsSuccessStatusCode)
+            {
+                Console.WriteLine("Image uploaded successfully.");
+            }
+            else
+            {
+                var errorResponse = await response.Content.ReadAsStringAsync();
+                Console.WriteLine($"فشل في رفع الصورة: {errorResponse}");
+            }
+        }
+    }
+
+
+}
+ *@
+
+   @*   @page "/display-images"
+@using Microsoft.AspNetCore.Components.Forms
+@using System.Net.Http.Headers
+@inject HttpClient Http
+@inject IJSRuntime JS
+@inject NavigationManager NavigationManager
+
+
+
+<h3>معرض الصور</h3>
+
+@if (imageDataList != null && imageDataList.Count > 0)
+{
+    <div class="row">
+        @foreach (var imageData in imageDataList)
+        {
+            <div class="col-md-4">
+                <div class="card mb-4">
+                    <img src="@($"https://localhost:7252/{imageData.ImageName}")" class="card-img-top" alt="صورة @imageData.Item" />
+                    <div class="card-body">
+                        <h5 class="card-title">@imageData.Item</h5>
+                        <p class="card-text">الوصف: @imageData.Description</p>
+                        <p class="card-text">السعر: @imageData.Price</p>
+                        <p class="card-text">الكمية: @imageData.Quantity</p>
+                        <button class="btn btn-primary" @onclick="() => EditImage(imageData)">تعديل</button>
+                    </div>
+                </div>
+            </div>
+        }
+    </div>
+
+    @if (isEditModalVisible)
+    {
+        <div class="modal show d-block" tabindex="-1">
+            <div class="modal-dialog">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title">تعديل المنتج</h5>
+                        <button type="button" class="btn-close" @onclick="CloseEditModal"></button>
+                    </div>
+                    <div class="modal-body">
+                        <InputFile OnChange="OnInputFileChange" class="form-control" />
+                        <input type="number" class="form-control mt-2" @bind="editImageData.Price" placeholder="تحديث السعر" />
+                        <input type="text" class="form-control mt-2" @bind="editImageData.Description" placeholder="تحديث الوصف" />
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" @onclick="CloseEditModal">إلغاء</button>
+                        <button type="button" class="btn btn-primary" @onclick="() => UpdateImage()">حفظ التغييرات</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    }
+}
+else
+{
+    <p>لا توجد صور لعرضها.</p>
+}
+
+@code {
+    private List<Models.GetImageResponse> imageDataList;
+    private Models.GetImageResponse editImageData = new Models.GetImageResponse();
+    private bool isEditModalVisible = false;
+    private string tablenames;
+
+    protected override async Task OnInitializedAsync()
+    {
+       // var response = await Http.GetFromJsonAsync<List<Models.GetImageResponse>>("https://localhost:7252/Control/GetAllImages");
+        //if (response != null)
+        //{
+          //  imageDataList = response;
+       // }
+
+        var tableName = await JS.InvokeAsync<string>("sessionStorage.getItem", "TableName");
+        tablenames = tableName;
+        editImageData.TableName = tableName;
+        if (!string.IsNullOrEmpty(tableName))
+        {
+            try
+            {
+                imageDataList = await Http.GetFromJsonAsync<List<Models.GetImageResponse>>($"https://localhost:7252/Control/GetImages?tableName={tableName}");
+            }
+            catch (HttpRequestException ex)
+            {
+                Console.WriteLine($"Request error: {ex.Message}");
+            }
+        }
+    }
+
+    private void EditImage(Models.GetImageResponse imageData)
+    {
+        editImageData = imageData;
+        isEditModalVisible = true;
+    }
+
+    private void CloseEditModal()
+    {
+        isEditModalVisible = false;
+    }
+
+    /*private async Task OnInputFileChange(InputFileChangeEventArgs e)
+    {
+        editImageData.TableName = tablenames;
+        var file = e.File;
+        if (file != null)
+        {
+            using var content = new MultipartFormDataContent();
+            using var stream = file.OpenReadStream();
+            var fileContent = new StreamContent(stream);
+            fileContent.Headers.ContentType = new MediaTypeHeaderValue(file.ContentType);
+
+            content.Add(fileContent, "file", file.Name);
+            content.Add(new StringContent(editImageData.Item), "item");
+
+            var response = await Http.PostAsync("https://localhost:7252/Control/UploadImage", content);
+
+            if (response.IsSuccessStatusCode)
+            {
+                Console.WriteLine("تم رفع الصورة بنجاح.");
+            }
+            else
+            {
+                var errorResponse = await response.Content.ReadAsStringAsync();
+                Console.WriteLine($"فشل في رفع الصورة: {errorResponse}");
+            }
+        }
+    }
+    */
+    private async Task OnInputFileChange(InputFileChangeEventArgs e)
+    {
+        editImageData.TableName = tablenames; // تعيين اسم الجدول هنا
+
+        // تحقق من أن TableName مملوءة
+        if (string.IsNullOrEmpty(editImageData.TableName))
+        {
+            Console.WriteLine("اسم الجدول (TableName) غير مملوء. يرجى التأكد من تعيينه بشكل صحيح.");
+            return;
+        }
+
+        var file = e.File;
+        if (file != null)
+        {
+            using var content = new MultipartFormDataContent();
+            using var stream = file.OpenReadStream();
+            var fileContent = new StreamContent(stream);
+            fileContent.Headers.ContentType = new MediaTypeHeaderValue(file.ContentType);
+
+            content.Add(fileContent, "file", file.Name);
+            content.Add(new StringContent(editImageData.Item), "item");
+            content.Add(new StringContent(editImageData.TableName), "folder"); // تمرير اسم الجدول كـ folder
+
+            var response = await Http.PostAsync("https://localhost:7252/Control/UploadImage", content);
+
+            if (response.IsSuccessStatusCode)
+            {
+                Console.WriteLine("تم رفع الصورة بنجاح.");
+            }
+            else
+            {
+                var errorResponse = await response.Content.ReadAsStringAsync();
+                Console.WriteLine($"فشل في رفع الصورة: {errorResponse}");
+            }
+        }
+    }
+
+    private async Task UpdateImage()
+    {
+        var response = await Http.PutAsJsonAsync("https://localhost:7252/Control/UpdateImage", editImageData);
+        if (response.IsSuccessStatusCode)
+        {
+            Console.WriteLine("تم تحديث المنتج بنجاح.");
+            isEditModalVisible = false;
+        }
+        else
+        {
+            var errorResponse = await response.Content.ReadAsStringAsync();
+            Console.WriteLine($"فشل في تحديث المنتج: {errorResponse}");
+        }
+    }
+}
+ *@
+
+ @*    @page "/display-images"
+@using Microsoft.AspNetCore.Components.Forms
+@using System.Net.Http.Headers
+@inject HttpClient Http
+@inject IJSRuntime JS
+@inject NavigationManager NavigationManager
+
+<h3>معرض الصور</h3>
+
+@if (imageDataList != null && imageDataList.Count > 0)
+{
+    <div class="row">
+        @foreach (var imageData in imageDataList)
+        {
+            <div class="col-md-4">
+                <div class="card mb-4">
+                    <img src="@($"https://localhost:7252/{imageData.TableName}/{imageData.ImageName}")" class="card-img-top" alt="صورة @imageData.Item" />
+                    <div class="card-body">
+                        <h5 class="card-title">@imageData.Item</h5>
+                        <p class="card-text">الوصف: @imageData.Description</p>
+                        <p class="card-text">السعر: @imageData.Price</p>
+                        <p class="card-text">الكمية: @imageData.Quantity</p>
+                        <button class="btn btn-primary" @onclick="() => EditImage(imageData)">تعديل</button>
+                    </div>
+                </div>
+            </div>
+        }
+    </div>
+
+    @if (isEditModalVisible)
+    {
+        <div class="modal show d-block" tabindex="-1">
+            <div class="modal-dialog">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title">تعديل المنتج</h5>
+                        <button type="button" class="btn-close" @onclick="CloseEditModal"></button>
+                    </div>
+                    <div class="modal-body">
+                        <InputFile OnChange="OnInputFileChange" class="form-control" />
+                        <input type="number" class="form-control mt-2" @bind="editImageData.Price" placeholder="تحديث السعر" />
+                        <input type="text" class="form-control mt-2" @bind="editImageData.Description" placeholder="تحديث الوصف" />
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" @onclick="CloseEditModal">إلغاء</button>
+                        <button type="button" class="btn btn-primary" @onclick="UpdateImage">حفظ التغييرات</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    }
+}
+else
+{
+    <p>لا توجد صور لعرضها.</p>
+}
+
+@code {
+    private List<Models.GetImageResponse> imageDataList;
+    private Models.GetImageResponse editImageData = new Models.GetImageResponse();
+    private bool isEditModalVisible = false;
+    private IBrowserFile uploadedImage;
+    public string tablenames;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var tableName = await JS.InvokeAsync<string>("sessionStorage.getItem", "TableName");
+        tablenames = tableName;
+        editImageData.TableName = tableName;
+        if (!string.IsNullOrEmpty(tableName))
+        {
+            try
+            {
+                imageDataList = await Http.GetFromJsonAsync<List<Models.GetImageResponse>>($"https://localhost:7252/Control/GetImages?tableName={tableName}");
+            }
+            catch (HttpRequestException ex)
+            {
+                Console.WriteLine($"Request error: {ex.Message}");
+            }
+        }
+    }
+
+    private void EditImage(Models.GetImageResponse imageData)
+    {
+        editImageData = imageData;
+        isEditModalVisible = true;
+    }
+
+    private void CloseEditModal()
+    {
+        isEditModalVisible = false;
+    }
+
+    private async Task OnInputFileChange(InputFileChangeEventArgs e)
+    {
+        uploadedImage = e.File;
+        if (uploadedImage == null)
+        {
+            Console.WriteLine("لم يتم تحميل أي صورة.");
+            return;
+        }
+        editImageData.TableName = tablenames;
+
+        // التأكد من أن tableName غير فارغ
+        if (string.IsNullOrEmpty(editImageData.TableName))
+        {
+            Console.WriteLine("22222قيمة tableName غير صالحة. يرجى التأكد من تعيينها.");
+            return;
+        }
+
+        Console.WriteLine("الصورة تم تحميلها بنجاح، جاري رفعها إلى الخادم...");
+
+        var imageName = await UploadImageToServer();
+      
+        if (!string.IsNullOrEmpty(imageName))
+        {
+            editImageData.ImageName = imageName;
+            Console.WriteLine($"تم رفع الصورة وتحديث اسم الصورة في البيانات إلى: {imageName}");
+        }
+        else
+        {
+            Console.WriteLine("فشل في رفع الصورة.");
+        }
+    }
+    /*
+    private async Task<string> UploadImageToServer()
+    {
+        try
+        {
+            if (uploadedImage == null)
+            {
+                Console.WriteLine("الصورة غير موجودة للرفع.");
+                return null;
+            }
+            editImageData.TableName = tablenames;
+
+            if (string.IsNullOrEmpty(editImageData.TableName))
+            {
+                Console.WriteLine("قيمة tableName غير صالحة. يرجى التأكد من تعيينها.");
+                return null;
+            }
+
+            using var content = new MultipartFormDataContent();
+            using var stream = uploadedImage.OpenReadStream();
+            var fileContent = new StreamContent(stream);
+            fileContent.Headers.ContentType = new MediaTypeHeaderValue(uploadedImage.ContentType);
+
+            var uniqueImageName = $"{editImageData.Item}_{DateTime.Now:yyyyMMddHHmmss}_{uploadedImage.Name}";
+            // إضافة الملف إلى MultipartFormDataContent
+            //content.Add(fileContent, "file", uploadedImage.Name);
+            content.Add(fileContent, "file", uniqueImageName);
+
+            // اسم الصورة مع `Item`
+
+
+            // رفع الصورة مع تضمين folder كقيمة لـ tableName
+            var response = await Http.PostAsync($"https://localhost:7252/Control/UploadImage?folder={editImageData.TableName}", content);
+
+            if (response.IsSuccessStatusCode)
+            {
+                Console.WriteLine("تم رفع الصورة بنجاح.");
+                return uniqueImageName; // إعادة اسم الصورة متضمنًا `Item`
+            }
+            else
+            {
+                var errorResponse = await response.Content.ReadAsStringAsync();
+                Console.WriteLine($"خطأ في رفع الصورة: {errorResponse}");
+                return null;
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"خطأ أثناء رفع الصورة: {ex.Message}");
+            return null;
+        }
+    }
+    */
+
+    private async Task<string> UploadImageToServer()
+    {
+        try
+        {
+            if (uploadedImage == null)
+            {
+                Console.WriteLine("الصورة غير موجودة للرفع.");
+                return null;
+            }
+
+            editImageData.TableName = tablenames;
+
+            if (string.IsNullOrEmpty(editImageData.TableName))
+            {
+                Console.WriteLine("قيمة tableName غير صالحة. يرجى التأكد من تعيينها.");
+                return null;
+            }
+
+            using var content = new MultipartFormDataContent();
+            using var stream = uploadedImage.OpenReadStream();
+            var fileContent = new StreamContent(stream);
+            fileContent.Headers.ContentType = new MediaTypeHeaderValue(uploadedImage.ContentType);
+
+            // إضافة الملف إلى MultipartFormDataContent
+            content.Add(fileContent, "file", uploadedImage.Name);
+
+            // رفع الصورة مع تضمين folder كقيمة لـ tableName
+            var response = await Http.PostAsync($"https://localhost:7252/Control/UploadImage?folder={editImageData.TableName}", content);
+
+            if (response.IsSuccessStatusCode)
+            {
+                var responseData = await response.Content.ReadFromJsonAsync<dynamic>();
+                var filePath = (string)responseData.filePath;  // الحصول على المسار النسبي من استجابة الخادم
+                Console.WriteLine("تم رفع الصورة بنجاح.");
+                return filePath;
+            }
+            else
+            {
+                var errorResponse = await response.Content.ReadAsStringAsync();
+                Console.WriteLine($"خطأ في رفع الصورة: {errorResponse}");
+                return null;
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"خطأ أثناء رفع الصورة: {ex.Message}");
+            return null;
+        }
+    }
+
+
+
+/*
+    private async Task<string> UploadImageToServer()
+    {
+        try
+        {
+            if (uploadedImage == null)
+            {
+                Console.WriteLine("الصورة غير موجودة للرفع.");
+                return null;
+            }
+            editImageData.TableName = tablenames;
+
+            if (string.IsNullOrEmpty(editImageData.TableName))
+            {
+                Console.WriteLine("قيمة tableName غير صالحة. يرجى التأكد من تعيينها.");
+                return null;
+            }
+
+            using var content = new MultipartFormDataContent();
+            using var stream = uploadedImage.OpenReadStream();
+            var fileContent = new StreamContent(stream);
+            fileContent.Headers.ContentType = new MediaTypeHeaderValue(uploadedImage.ContentType);
+
+            // إضافة الملف إلى MultipartFormDataContent
+            content.Add(fileContent, "file", uploadedImage.Name);
+
+            // رفع الصورة مع تضمين folder كقيمة لـ tableName
+            var response = await Http.PostAsync($"https://localhost:7252/Control/UploadImage?folder={editImageData.TableName}", content);
+
+            if (response.IsSuccessStatusCode)
+            {
+                var imageName = $"{editImageData.Item}_{uploadedImage.Name}";
+                Console.WriteLine("تم رفع الصورة بنجاح.");
+                return imageName;
+            }
+            else
+            {
+                var errorResponse = await response.Content.ReadAsStringAsync();
+                Console.WriteLine($"خطأ في رفع الصورة: {errorResponse}");
+                return null;
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"خطأ أثناء رفع الصورة: {ex.Message}");
+            return null;
+        }
+    }
+    */
+
+    private async Task UpdateImage()
+    {
+        if (string.IsNullOrEmpty(editImageData.TableName) || string.IsNullOrEmpty(editImageData.Item))
+        {
+            Console.WriteLine("بيانات غير مكتملة للتحديث.");
+            return;
+        }
+
+        // إعداد البيانات التي سيتم إرسالها للتحديث
+        var updateData = new
+        {
+            TableName = editImageData.TableName,
+            Item = editImageData.Item,
+            Price = editImageData.Price,
+            Quantity = editImageData.Quantity,
+            Description = editImageData.Description,
+            ImageName = editImageData.ImageName // اسم الصورة بعد التحديث، إن وجد
+        };
+
+        // إرسال طلب التحديث إلى API
+        var response = await Http.PutAsJsonAsync("https://localhost:7252/Control/UpdateImage", updateData);
+
+        if (response.IsSuccessStatusCode)
+        {
+            Console.WriteLine("تم تحديث البيانات بنجاح.");
+            // يمكن تحديث الواجهة بعد التحديث إذا لزم الأمر
+        }
+        else
+        {
+            var errorResponse = await response.Content.ReadAsStringAsync();
+            Console.WriteLine($"فشل في تحديث البيانات: {errorResponse}");
+        }
+
+        // إغلاق النافذة بعد إتمام التحديث
+        CloseEditModal();
+    }
+}
+
+<img src="@(!string.IsNullOrEmpty(imageData.ImageName) ? $"https://localhost:7252/{imageData.TableName?.Trim('/')}/{imageData.ImageName?.Trim('/')}" : "مسار_صورة_افتراضية.png")" class="card-img-top" alt="صورة @imageData.Item" />
+ *@
+@* 
+        @page "/display-images"
+@using Microsoft.AspNetCore.Components.Forms
+@using System.Net.Http.Headers
+@inject HttpClient Http
+@inject IJSRuntime JS
+@inject NavigationManager NavigationManager
+
+<h3>معرض الصور</h3>
+
+@if (imageDataList != null && imageDataList.Count > 0)
+{
+    <div class="row">
+        @foreach (var imageData in imageDataList)
+        {
+            <div class="col-md-4">
+                <div class="card mb-4">
+                
+                        
+                    <img src="@($"https://localhost:7252/{imageData.TableName?.Trim('/')}/{imageData.ImageName?.Trim('/')}?t={DateTime.Now.Ticks}")" class="card-img-top" alt="صورة @imageData.Item" />  
+
+                
+                    <div class="card-body">
+                        <h5 class="card-title">@imageData.Item</h5>
+                        <p class="card-text">الوصف: @imageData.Description</p>
+                        <p class="card-text">السعر: @imageData.Price</p>
+                        <p class="card-text">الكمية: @imageData.Quantity</p>
+                        <button class="btn btn-primary" @onclick="() => EditImage(imageData)">تعديل</button>
+                       
+                    </div>
+                </div>
+            </div>
+        }
+    </div>
+
+    @if (isEditModalVisible)
+    {
+        <div class="modal show d-block" tabindex="-1">
+            <div class="modal-dialog">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title">تعديل المنتج</h5>
+                        <button type="button" class="btn-close" @onclick="CloseEditModal"></button>
+                    </div>
+                    <div class="modal-body">
+                        <InputFile OnChange="OnInputFileChange" class="form-control" />
+                        <input type="number" class="form-control mt-2" @bind="editImageData.Price" placeholder="تحديث السعر" />
+                        <input type="text" class="form-control mt-2" @bind="editImageData.Description" placeholder="تحديث الوصف" />
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" @onclick="CloseEditModal">إلغاء</button>
+                        <button type="button" class="btn btn-primary" @onclick="UpdateImage">حفظ التغييرات</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    }
+}
+else
+{
+    <p>لا توجد صور لعرضها.</p>
+}
+
+@code {
+    private List<Models.GetImageResponse> imageDataList;
+    private Models.GetImageResponse editImageData = new Models.GetImageResponse();
+    private bool isEditModalVisible = false;
+    private IBrowserFile uploadedImage;
+    private string tableName;
+    private bool isEditing = false;
+
+
+    private async Task LoadImages()
+    {
+        tableName = await JS.InvokeAsync<string>("sessionStorage.getItem", "TableName");
+        // editImageData.TableName = tableName;
+
+        if (!string.IsNullOrEmpty(tableName))
+        {
+            try
+            {
+                imageDataList = await Http.GetFromJsonAsync<List<Models.GetImageResponse>>($"https://localhost:7252/Control/GetImages?tableName={tableName}");
+                //  Console.WriteLine($"Image full path: https://localhost:7252/uploads/{imageDataList..Trim('/')}/{imageData.ImageName.Trim()}");
+                isEditing = false;
+                foreach (var imageData in imageDataList)
+                {
+                    Console.WriteLine($"TableName: {imageData.TableName}, ImageName: {imageData.ImageName}");
+                }
+            }
+            catch (HttpRequestException ex)
+            {
+                Console.WriteLine($"صصصصصصصRequest error: {ex.Message}");
+            }
+        }
+    }
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadImages();
+
+    }
+
+    private void EditImage(Models.GetImageResponse imageData)
+    {
+        editImageData = imageData;
+        isEditModalVisible = true;
+        isEditing = true;
+    }
+
+    private void CloseEditModal()
+    {
+        isEditModalVisible = false;
+        editImageData = new Models.GetImageResponse();
+    }
+
+    private async Task OnInputFileChange(InputFileChangeEventArgs e)
+    {
+        uploadedImage = e.File;
+     
+    }
+
+    private async Task<string> UploadImageToServer()
+    {
+        editImageData.TableName = tableName;
+        try
+        {
+            if (uploadedImage == null)
+            {
+                Console.WriteLine("الصورة غير موجودة للرفع.");
+                return null;
+            }
+
+            using var content = new MultipartFormDataContent();
+            using var stream = uploadedImage.OpenReadStream();
+            var fileContent = new StreamContent(stream);
+            fileContent.Headers.ContentType = new MediaTypeHeaderValue(uploadedImage.ContentType);
+
+            var uniqueImageName = $"{editImageData.Item}_{DateTime.Now:yyyyMMddHHmmss}_{uploadedImage.Name}";
+            content.Add(fileContent, "file", uniqueImageName);
+
+            var uploadPath = $"https://localhost:7252/Control/UploadImage?folder={editImageData.TableName}";
+            Console.WriteLine($"Uploading to: {uploadPath}");
+
+            var response = await Http.PostAsync(uploadPath, content);
+            //var response = await Http.PostAsync($"https://localhost:7252/Control/UploadImage?folder={editImageData.TableName}", content);
+            Console.WriteLine($"Uploading to: {response}");
+            await Task.Delay(500);
+            if (response.IsSuccessStatusCode)
+            {
+                Console.WriteLine("تم رفع الصورة بنجاح.");
+                return uniqueImageName; // إرجاع اسم الصورة فقط
+
+            }
+            else
+            {
+                var errorResponse = await response.Content.ReadAsStringAsync();
+                Console.WriteLine($"خطأ في رفع الصورة: {errorResponse}");
+                return null;
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"خطأ أثناء رفع الصورة: {ex.Message}");
+            return null;
+        }
+    }
+
+    private async Task UpdateImage()
+    {
+        editImageData.TableName = tableName;
+        if (uploadedImage != null)
+        {
+            var imageName = await UploadImageToServer();
+            if (!string.IsNullOrEmpty(imageName))
+            {
+                editImageData.ImageName = imageName;
+            }
+        }
+
+        var response = await Http.PutAsJsonAsync("https://localhost:7252/Control/UpdateImage", editImageData);
+
+        if (response.IsSuccessStatusCode)
+        {
+           // await Task.Delay(500);
+          
+            Console.WriteLine("تم تحديث البيانات بنجاح.");
+
+            await LoadImages();
+          
+        }
+        else
+        {
+            var errorResponse = await response.Content.ReadAsStringAsync();
+            Console.WriteLine($"فشل في تحديث البيانات: {errorResponse}");
+        }
+
+        CloseEditModal();
+    }
+}
+ *@
+
+@*     
+   الكود هدا شغال 100 100 
+
+@page "/display-images"
+@using Microsoft.AspNetCore.Components.Forms
+@using System.Net.Http.Headers
+@inject HttpClient Http
+@inject IJSRuntime JS
+@inject NavigationManager NavigationManager
+
+<h3>معرض الصور</h3>
+
+@if (imageDataList != null && imageDataList.Count > 0)
+{
+    <div class="row">
+        @foreach (var imageData in imageDataList)
+        {
+            <div class="col-md-4">
+                <div class="card mb-4">
+                    <img src="@GetCorrectImagePath(imageData)" class="card-img-top" alt="صورة @imageData.Item" />
+                    <div class="card-body">
+                        <h5 class="card-title">@imageData.Item</h5>
+                        <p class="card-text">الوصف: @imageData.Description</p>
+                        <p class="card-text">السعر: @imageData.Price</p>
+                        <p class="card-text">الكمية: @imageData.Quantity</p>
+                        <button class="btn btn-primary" @onclick="() => EditImage(imageData)">تعديل</button>
+                    </div>
+                </div>
+            </div>
+        }
+    </div>
+
+    @if (isEditModalVisible)
+    {
+        <div class="modal show d-block" tabindex="-1">
+            <div class="modal-dialog">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title">تعديل المنتج</h5>
+                        <button type="button" class="btn-close" @onclick="CloseEditModal"></button>
+                    </div>
+                    <div class="modal-body">
+                        <InputFile OnChange="OnInputFileChange" class="form-control" />
+                        <input type="number" class="form-control mt-2" @bind="editImageData.Price" placeholder="تحديث السعر" />
+                        <input type="text" class="form-control mt-2" @bind="editImageData.Description" placeholder="تحديث الوصف" />
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" @onclick="CloseEditModal">إلغاء</button>
+                        <button type="button" class="btn btn-primary" @onclick="UpdateImage">حفظ التغييرات</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    }
+}
+else
+{
+    <p>لا توجد صور لعرضها.</p>
+}
+
+@code {
+    private List<Models.GetImageResponse> imageDataList;
+    private Models.GetImageResponse editImageData = new Models.GetImageResponse();
+    private bool isEditModalVisible = false;
+    private IBrowserFile uploadedImage;
+    private string tableName;
+    private bool isEditing = false;
+
+    private async Task LoadImages()
+    {
+        tableName = await JS.InvokeAsync<string>("sessionStorage.getItem", "TableName");
+
+        if (!string.IsNullOrEmpty(tableName))
+        {
+            try
+            {
+                imageDataList = await Http.GetFromJsonAsync<List<Models.GetImageResponse>>($"https://localhost:7252/Control/GetImages?tableName={tableName}");
+                isEditing = false;
+                foreach (var imageData in imageDataList)
+                {
+                    Console.WriteLine($"TableName: {imageData.TableName}, ImageName: {imageData.ImageName}");
+                }
+            }
+            catch (HttpRequestException ex)
+            {
+                Console.WriteLine($"Request error: {ex.Message}");
+            }
+        }
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadImages();
+    }
+
+    private void EditImage(Models.GetImageResponse imageData)
+    {
+        editImageData = imageData;
+        isEditModalVisible = true;
+        isEditing = true;
+    }
+
+    private void CloseEditModal()
+    {
+        isEditModalVisible = false;
+        editImageData = new Models.GetImageResponse();
+    }
+
+    private async Task OnInputFileChange(InputFileChangeEventArgs e)
+    {
+        uploadedImage = e.File;
+    }
+
+    private async Task<string> UploadImageToServer()
+    {
+        editImageData.TableName = tableName;
+        try
+        {
+            if (uploadedImage == null)
+            {
+                Console.WriteLine("الصورة غير موجودة للرفع.");
+                return null;
+            }
+
+            using var content = new MultipartFormDataContent();
+            using var stream = uploadedImage.OpenReadStream();
+            var fileContent = new StreamContent(stream);
+            fileContent.Headers.ContentType = new MediaTypeHeaderValue(uploadedImage.ContentType);
+
+            var uniqueImageName = $"{editImageData.Item}_{DateTime.Now:yyyyMMddHHmmss}_{uploadedImage.Name}";
+            content.Add(fileContent, "file", uniqueImageName);
+
+            var uploadPath = $"https://localhost:7252/Control/UploadImage?folder={editImageData.TableName}";
+            Console.WriteLine($"Uploading to: {uploadPath}");
+
+            var response = await Http.PostAsync(uploadPath, content);
+            await Task.Delay(500);
+            if (response.IsSuccessStatusCode)
+            {
+                Console.WriteLine("تم رفع الصورة بنجاح.");
+                return uniqueImageName;
+            }
+            else
+            {
+                var errorResponse = await response.Content.ReadAsStringAsync();
+                Console.WriteLine($"خطأ في رفع الصورة: {errorResponse}");
+                return null;
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"خطأ أثناء رفع الصورة: {ex.Message}");
+            return null;
+        }
+    }
+
+    private async Task UpdateImage()
+    {
+        editImageData.TableName = tableName;
+        if (uploadedImage != null)
+        {
+            var imageName = await UploadImageToServer();
+            if (!string.IsNullOrEmpty(imageName))
+            {
+                editImageData.ImageName = imageName;
+            }
+        }
+
+        var response = await Http.PutAsJsonAsync("https://localhost:7252/Control/UpdateImage", editImageData);
+
+        if (response.IsSuccessStatusCode)
+        {
+            Console.WriteLine("تم تحديث البيانات بنجاح.");
+            await LoadImages();
+        }
+        else
+        {
+            var errorResponse = await response.Content.ReadAsStringAsync();
+            Console.WriteLine($"فشل في تحديث البيانات: {errorResponse}");
+        }
+
+        CloseEditModal();
+    }
+
+    private string GetCorrectImagePath(Models.GetImageResponse imageData)
+    {
+        string imagePath = imageData.ImageName;
+        if (imagePath.StartsWith("/uploads/"))
+        {
+            return $"https://localhost:7252{imagePath}?t={DateTime.Now.Ticks}";
+        }
+        else
+        {
+            return $"https://localhost:7252/uploads/{imageData.TableName}/{imageData.ImageName}?t={DateTime.Now.Ticks}";
+        }
+    }
+} *@
+
+@* @code {
+    private List<Models.GetImageResponse> imageDataList;
+    private Models.GetImageResponse editImageData = new Models.GetImageResponse();
+    private bool isEditModalVisible = false;
+    private IBrowserFile uploadedImage;
+    private string tableName;
+    private bool isEditing = false;
+    private string oldImageName; // اسم الصورة القديمة مؤقتاً
+
+    private async Task LoadImages()
+    {
+        tableName = await JS.InvokeAsync<string>("sessionStorage.getItem", "TableName");
+
+        if (!string.IsNullOrEmpty(tableName))
+        {
+            try
+            {
+                imageDataList = await Http.GetFromJsonAsync<List<Models.GetImageResponse>>($"https://localhost:7252/Control/GetImages?tableName={tableName}");
+                isEditing = false;
+                foreach (var imageData in imageDataList)
+                {
+                    Console.WriteLine($"TableName: {imageData.TableName}, ImageName: {imageData.ImageName}");
+                }
+            }
+            catch (HttpRequestException ex)
+            {
+                Console.WriteLine($"Request error: {ex.Message}");
+            }
+        }
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadImages();
+    }
+
+    private void EditImage(Models.GetImageResponse imageData)
+    {
+        editImageData = imageData;
+        oldImageName = imageData.ImageName; // تخزين اسم الصورة القديمة مؤقتاً
+        isEditModalVisible = true;
+        isEditing = true;
+    }
+
+    private void CloseEditModal()
+    {
+        isEditModalVisible = false;
+        editImageData = new Models.GetImageResponse();
+    }
+
+    private async Task OnInputFileChange(InputFileChangeEventArgs e)
+    {
+        uploadedImage = e.File;
+    }
+
+    private async Task<string> UploadImageToServer()
+    {
+        editImageData.TableName = tableName;
+        try
+        {
+            if (uploadedImage == null)
+            {
+                Console.WriteLine("الصورة غير موجودة للرفع.");
+                return null;
+            }
+
+            using var content = new MultipartFormDataContent();
+            using var stream = uploadedImage.OpenReadStream();
+            var fileContent = new StreamContent(stream);
+            fileContent.Headers.ContentType = new MediaTypeHeaderValue(uploadedImage.ContentType);
+
+            var uniqueImageName = $"{editImageData.Item}_{DateTime.Now:yyyyMMddHHmmss}_{uploadedImage.Name}";
+            content.Add(fileContent, "file", uniqueImageName);
+
+            var uploadPath = $"https://localhost:7252/Control/UploadImage?folder={editImageData.TableName}";
+            Console.WriteLine($"Uploading to: {uploadPath}");
+
+            var response = await Http.PostAsync(uploadPath, content);
+            await Task.Delay(500);
+            if (response.IsSuccessStatusCode)
+            {
+                Console.WriteLine("تم رفع الصورة بنجاح.");
+                return uniqueImageName;
+            }
+            else
+            {
+                var errorResponse = await response.Content.ReadAsStringAsync();
+                Console.WriteLine($"خطأ في رفع الصورة: {errorResponse}");
+                return null;
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"خطأ أثناء رفع الصورة: {ex.Message}");
+            return null;
+        }
+    }
+
+    private async Task DeleteImageFromServer(string imageName)
+    {
+        if (!string.IsNullOrEmpty(imageName))
+        {
+            var deletePath = $"https://localhost:7252/Control/DeleteImage?folder={editImageData.TableName}&imageName={imageName}";
+            var response = await Http.DeleteAsync(deletePath);
+
+            if (response.IsSuccessStatusCode)
+            {
+                Console.WriteLine("تم حذف الصورة القديمة بنجاح.");
+            }
+            else
+            {
+                var errorResponse = await response.Content.ReadAsStringAsync();
+                Console.WriteLine($"فشل في حذف الصورة القديمة: {errorResponse}");
+            }
+        }
+    }
+
+    private async Task UpdateImage()
+    {
+        editImageData.TableName = tableName;
+        if (uploadedImage != null)
+        {
+            // حذف الصورة القديمة إذا كان هناك صورة جديدة
+            await DeleteImageFromServer(oldImageName);
+
+            var imageName = await UploadImageToServer();
+            if (!string.IsNullOrEmpty(imageName))
+            {
+                editImageData.ImageName = imageName;
+            }
+        }
+
+        var response = await Http.PutAsJsonAsync("https://localhost:7252/Control/UpdateImage", editImageData);
+
+        if (response.IsSuccessStatusCode)
+        {
+            Console.WriteLine("تم تحديث البيانات بنجاح.");
+            await LoadImages();
+        }
+        else
+        {
+            var errorResponse = await response.Content.ReadAsStringAsync();
+            Console.WriteLine($"فشل في تحديث البيانات: {errorResponse}");
+        }
+
+        CloseEditModal();
+    }
+
+    private string GetCorrectImagePath(Models.GetImageResponse imageData)
+    {
+        string imagePath = imageData.ImageName;
+        if (imagePath.StartsWith("/uploads/"))
+        {
+            return $"https://localhost:7252{imagePath}?t={DateTime.Now.Ticks}";
+        }
+        else
+        {
+            return $"https://localhost:7252/uploads/{imageData.TableName}/{imageData.ImageName}?t={DateTime.Now.Ticks}";
+        }
+    }
+} *@
+
+
+ @*        @page "/display-images"
+@using Microsoft.AspNetCore.Components.Forms
+@using System.Net.Http.Headers
+@inject HttpClient Http
+@inject IJSRuntime JS
+@inject NavigationManager NavigationManager
+
+<h3>معرض الصور</h3>
+
+@if (imageDataList != null && imageDataList.Count > 0)
+{
+    <div class="row">
+        @foreach (var imageData in imageDataList)
+        {
+            <div class="col-md-4">
+                <div class="card mb-4">
+                    <img src="@($"https://localhost:7252/{imageData.TableName?.Trim('/')}/{imageData.ImageName?.Trim('/')}?t={DateTime.Now.Ticks}")" class="card-img-top" alt="صورة @imageData.Item" />
+                    <div class="card-body">
+                        <h5 class="card-title">@imageData.Item</h5>
+                        <p class="card-text">الوصف: @imageData.Description</p>
+                        <p class="card-text">السعر: @imageData.Price</p>
+                        <p class="card-text">الكمية: @imageData.Quantity</p>
+                        <button class="btn btn-primary" @onclick="() => EditImage(imageData)">تعديل</button>
+                        <button class="btn btn-danger" @onclick="() => DeleteImage(imageData)">حذف</button>
+                    </div>
+                </div>
+            </div>
+        }
+    </div>
+
+    @if (isEditModalVisible)
+    {
+        <div class="modal show d-block" tabindex="-1">
+            <div class="modal-dialog">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title">تعديل المنتج</h5>
+                        <button type="button" class="btn-close" @onclick="CloseEditModal"></button>
+                    </div>
+                    <div class="modal-body">
+                        <InputFile OnChange="OnInputFileChange" class="form-control" />
+                        <input type="number" class="form-control mt-2" @bind="editImageData.Price" placeholder="تحديث السعر" />
+                        <input type="text" class="form-control mt-2" @bind="editImageData.Description" placeholder="تحديث الوصف" />
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" @onclick="CloseEditModal">إلغاء</button>
+                        <button type="button" class="btn btn-primary" @onclick="UpdateImage">حفظ التغييرات</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    }
+}
+else
+{
+    <p>لا توجد صور لعرضها.</p>
+}
+
+@code {
+    private List<Models.GetImageResponse> imageDataList;
+    private Models.GetImageResponse editImageData = new Models.GetImageResponse();
+    private bool isEditModalVisible = false;
+    private IBrowserFile uploadedImage;
+    private string tableName;
+    private bool isEditing = false;
+
+    private async Task LoadImages()
+    {
+        tableName = await JS.InvokeAsync<string>("sessionStorage.getItem", "TableName");
+
+        if (!string.IsNullOrEmpty(tableName))
+        {
+            try
+            {
+                imageDataList = await Http.GetFromJsonAsync<List<Models.GetImageResponse>>($"https://localhost:7252/Control/GetImages?tableName={tableName}");
+                isEditing = false;
+            }
+            catch (HttpRequestException ex)
+            {
+                Console.WriteLine($"Request error: {ex.Message}");
+            }
+        }
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadImages();
+    }
+
+    private void EditImage(Models.GetImageResponse imageData)
+    {
+        editImageData = imageData;
+        isEditModalVisible = true;
+        isEditing = true;
+    }
+
+    private void CloseEditModal()
+    {
+        isEditModalVisible = false;
+        editImageData = new Models.GetImageResponse();
+    }
+
+    private async Task OnInputFileChange(InputFileChangeEventArgs e)
+    {
+        uploadedImage = e.File;
+    }
+    /*
+    private async Task DeleteImage(Models.GetImageResponse imageData)
+    {
+        string responseMessage;
+
+        if (isEditing) // Check if in edit mode
+        {
+            // Remove image path from the database only
+            responseMessage = await Http.DeleteAsync($"https://localhost:7252/Control/DeleteImage?fileName={imageData.ImageName}&folder={imageData.TableName}&tableName={imageData.TableName}&item={imageData.Item}");
+        }
+        else
+        {
+            // Remove image from uploads and database
+            responseMessage = await Http.DeleteAsync($"https://localhost:7252/Control/DeleteImage?fileName={imageData.ImageName}&folder={imageData.TableName}&tableName={imageData.TableName}&item={imageData.Item}");
+        }
+
+        if (responseMessage.IsSuccessStatusCode)
+        {
+            await LoadImages(); // Refresh the image list
+            Console.WriteLine("تم حذف الصورة بنجاح.");
+        }
+        else
+        {
+            var errorResponse = await responseMessage.Content.ReadAsStringAsync();
+            Console.WriteLine($"فشل في حذف الصورة: {errorResponse}");
+        }
+    }
+    */
+
+    private async Task DeleteImage(Models.GetImageResponse imageData)
+    {
+        if (isEditing) // Check if in edit mode
+        {
+            // Remove image path from the database only
+            var response = await Http.DeleteAsync($"https://localhost:7252/Control/DeleteImage?fileName={imageData.ImageName}&folder={imageData.TableName}&tableName={imageData.TableName}&item={imageData.Item}");
+
+            if (response.IsSuccessStatusCode)
+            {
+                Console.WriteLine("تم حذف مسار الصورة بنجاح من قاعدة البيانات.");
+            }
+            else
+            {
+                var errorResponse = await response.Content.ReadAsStringAsync();
+                Console.WriteLine($"فشل في حذف مسار الصورة من قاعدة البيانات: {errorResponse}");
+            }
+        }
+        else
+        {
+            // Remove image from uploads and database
+            var response = await Http.DeleteAsync($"https://localhost:7252/Control/DeleteImage?fileName={imageData.ImageName}&folder={imageData.TableName}&tableName={imageData.TableName}&item={imageData.Item}");
+
+            if (response.IsSuccessStatusCode)
+            {
+                await LoadImages(); // Refresh the image list
+                Console.WriteLine("تم حذف الصورة من المجلد وقاعدة البيانات.");
+            }
+            else
+            {
+                var errorResponse = await response.Content.ReadAsStringAsync();
+                Console.WriteLine($"فشل في حذف الصورة: {errorResponse}");
+            }
+        }
+    }
+
+
+    private async Task<string> UploadImageToServer()
+    {
+        editImageData.TableName = tableName;
+        try
+        {
+            if (uploadedImage == null)
+            {
+                Console.WriteLine("الصورة غير موجودة للرفع.");
+                return null;
+            }
+
+            using var content = new MultipartFormDataContent();
+            using var stream = uploadedImage.OpenReadStream();
+            var fileContent = new StreamContent(stream);
+            fileContent.Headers.ContentType = new MediaTypeHeaderValue(uploadedImage.ContentType);
+
+            var uniqueImageName = $"{editImageData.Item}_{DateTime.Now:yyyyMMddHHmmss}_{uploadedImage.Name}";
+            content.Add(fileContent, "file", uniqueImageName);
+
+            var uploadPath = $"https://localhost:7252/Control/UploadImage?folder={editImageData.TableName}";
+            Console.WriteLine($"Uploading to: {uploadPath}");
+
+            var response = await Http.PostAsync(uploadPath, content);
+            await Task.Delay(500);
+            if (response.IsSuccessStatusCode)
+            {
+                Console.WriteLine("تم رفع الصورة بنجاح.");
+                return uniqueImageName; // إرجاع اسم الصورة فقط
+            }
+            else
+            {
+                var errorResponse = await response.Content.ReadAsStringAsync();
+                Console.WriteLine($"خطأ في رفع الصورة: {errorResponse}");
+                return null;
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"خطأ أثناء رفع الصورة: {ex.Message}");
+            return null;
+        }
+    }
+
+    private async Task UpdateImage()
+    {
+        editImageData.TableName = tableName;
+        if (uploadedImage != null)
+        {
+            var imageName = await UploadImageToServer();
+            if (!string.IsNullOrEmpty(imageName))
+            {
+                editImageData.ImageName = imageName;
+            }
+        }
+
+        var response = await Http.PutAsJsonAsync("https://localhost:7252/Control/UpdateImage", editImageData);
+
+        if (response.IsSuccessStatusCode)
+        {
+            Console.WriteLine("تم تحديث البيانات بنجاح.");
+            await LoadImages();
+        }
+        else
+        {
+            var errorResponse = await response.Content.ReadAsStringAsync();
+            Console.WriteLine($"فشل في تحديث البيانات: {errorResponse}");
+        }
+
+        CloseEditModal();
+    }
+}
+ *@
+
+       @*  @page "/display-images"
+@using Microsoft.AspNetCore.Components.Forms
+@using System.Net.Http.Headers
+@inject HttpClient Http
+@inject IJSRuntime JS
+@inject NavigationManager NavigationManager
+
+<h3>معرض الصور</h3>
+
+@if (imageDataList != null && imageDataList.Count > 0)
+{
+    <div class="row">
+        @foreach (var imageData in imageDataList)
+        {
+            <div class="col-md-4">
+                <div class="card mb-4">
+                    <img src="@GetImagePath(imageData)" class="card-img-top" alt="صورة @imageData.Item" />
+                    <div class="card-body">
+                        <h5 class="card-title">@imageData.Item</h5>
+                        <p class="card-text">الوصف: @imageData.Description</p>
+                        <p class="card-text">السعر: @imageData.Price</p>
+                        <p class="card-text">الكمية: @imageData.Quantity</p>
+                        <button class="btn btn-primary" @onclick="() => EditImage(imageData)">تعديل</button>
+                        <button class="btn btn-danger" @onclick="() => DeleteImage(imageData)">حذف</button>
+                    </div>
+                </div>
+            </div>
+        }
+    </div>
+
+    @if (isEditModalVisible)
+    {
+        <div class="modal show d-block" tabindex="-1">
+            <div class="modal-dialog">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title">تعديل المنتج</h5>
+                        <button type="button" class="btn-close" @onclick="CloseEditModal"></button>
+                    </div>
+                    <div class="modal-body">
+                        <InputFile OnChange="OnInputFileChange" class="form-control" />
+                        <input type="number" class="form-control mt-2" @bind="editImageData.Price" placeholder="تحديث السعر" />
+                        <input type="text" class="form-control mt-2" @bind="editImageData.Description" placeholder="تحديث الوصف" />
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" @onclick="CloseEditModal">إلغاء</button>
+                        <button type="button" class="btn btn-primary" @onclick="UpdateImage">حفظ التغييرات</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    }
+}
+else
+{
+    <p>لا توجد صور لعرضها.</p>
+}
+
+@code {
+    private List<Models.GetImageResponse> imageDataList;
+    private Models.GetImageResponse editImageData = new Models.GetImageResponse();
+    private bool isEditModalVisible = false;
+    private IBrowserFile uploadedImage;
+    private string tableName;
+    private bool isEditing = false;
+
+    private async Task LoadImages()
+    {
+        tableName = await JS.InvokeAsync<string>("sessionStorage.getItem", "TableName");
+
+        if (!string.IsNullOrEmpty(tableName))
+        {
+            try
+            {
+                imageDataList = await Http.GetFromJsonAsync<List<Models.GetImageResponse>>($"https://localhost:7252/Control/GetImages?tableName={tableName}");
+                isEditing = false;
+            }
+            catch (HttpRequestException ex)
+            {
+                Console.WriteLine($"Request error: {ex.Message}");
+            }
+        }
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadImages();
+    }
+
+    private void EditImage(Models.GetImageResponse imageData)
+    {
+        editImageData = imageData;
+        isEditModalVisible = true;
+        isEditing = true;
+    }
+
+    private void CloseEditModal()
+    {
+        isEditModalVisible = false;
+        editImageData = new Models.GetImageResponse();
+    }
+
+    private async Task OnInputFileChange(InputFileChangeEventArgs e)
+    {
+        uploadedImage = e.File;
+    }
+
+    private async Task<string> UploadImageToServer()
+    {
+        editImageData.TableName = tableName;
+        try
+        {
+            if (uploadedImage == null)
+            {
+                Console.WriteLine("الصورة غير موجودة للرفع.");
+                return null;
+            }
+
+            using var content = new MultipartFormDataContent();
+            using var stream = uploadedImage.OpenReadStream();
+            var fileContent = new StreamContent(stream);
+            fileContent.Headers.ContentType = new MediaTypeHeaderValue(uploadedImage.ContentType);
+
+            var uniqueImageName = $"{editImageData.Item}_{DateTime.Now:yyyyMMddHHmmss}_{uploadedImage.Name}";
+            content.Add(fileContent, "file", uniqueImageName);
+
+            var uploadPath = $"https://localhost:7252/Control/UploadImage?folder={editImageData.TableName}";
+            Console.WriteLine($"Uploading to: {uploadPath}");
+
+            var response = await Http.PostAsync(uploadPath, content);
+            await Task.Delay(500);
+            if (response.IsSuccessStatusCode)
+            {
+                Console.WriteLine("تم رفع الصورة بنجاح.");
+                return uniqueImageName;
+            }
+            else
+            {
+                var errorResponse = await response.Content.ReadAsStringAsync();
+                Console.WriteLine($"خطأ في رفع الصورة: {errorResponse}");
+                return null;
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"خطأ أثناء رفع الصورة: {ex.Message}");
+            return null;
+        }
+    }
+
+    private async Task UpdateImage()
+    {
+        editImageData.TableName = tableName;
+        if (uploadedImage != null)
+        {
+            var imageName = await UploadImageToServer();
+            if (!string.IsNullOrEmpty(imageName))
+            {
+                editImageData.ImageName = imageName;
+            }
+        }
+
+        var response = await Http.PutAsJsonAsync("https://localhost:7252/Control/UpdateImage", editImageData);
+
+        if (response.IsSuccessStatusCode)
+        {
+            Console.WriteLine("تم تحديث البيانات بنجاح.");
+            await LoadImages();
+        }
+        else
+        {
+            var errorResponse = await response.Content.ReadAsStringAsync();
+            Console.WriteLine($"فشل في تحديث البيانات: {errorResponse}");
+        }
+
+        CloseEditModal();
+    }
+
+    private async Task DeleteImage(Models.GetImageResponse imageData)
+    {
+        var response = await Http.DeleteAsync($"https://localhost:7252/Control/DeleteImage?id={imageData.Id}");
+
+        if (response.IsSuccessStatusCode)
+        {
+            Console.WriteLine("تم حذف الصورة بنجاح.");
+            await LoadImages();
+        }
+        else
+        {
+            var errorResponse = await response.Content.ReadAsStringAsync();
+            Console.WriteLine($"فشل في حذف الصورة: {errorResponse}");
+        }
+    }
+
+    private string GetImagePath(Models.GetImageResponse imageData)
+    {
+        // تأكد من أن الصورة موجودة
+        if (string.IsNullOrEmpty(imageData.ImageName))
+        {
+            return "https://localhost:7252/uploads/default-image.png"; // صورة افتراضية إذا لم توجد صورة
+        }
+
+        // بناء المسار بناءً على المعلومات المتاحة
+        return $"https://localhost:7252/uploads/{imageData.TableName}/{imageData.ImageName}?t={DateTime.Now.Ticks}";
+    }
+}
+ *@
+
+    @*     @page "/display-images"
+@using Microsoft.AspNetCore.Components.Forms
+@using System.Net.Http.Headers
+@inject HttpClient Http
+@inject IJSRuntime JS
+@inject NavigationManager NavigationManager
+
+<h3>معرض الصور</h3>
+
+@if (imageDataList != null && imageDataList.Count > 0)
+{
+    <div class="row">
+        @foreach (var imageData in imageDataList)
+        {
+            <div class="col-md-4">
+                <div class="card mb-4">
+                    <img src="@GetImagePath(imageData)" class="card-img-top" alt="صورة @imageData.Item" />
+                    <div class="card-body">
+                        <h5 class="card-title">@imageData.Item</h5>
+                        <p class="card-text">الوصف: @imageData.Description</p>
+                        <p class="card-text">السعر: @imageData.Price</p>
+                        <p class="card-text">الكمية: @imageData.Quantity</p>
+                        <button class="btn btn-primary" @onclick="() => EditImage(imageData)">تعديل</button>
+                        <button class="btn btn-danger" @onclick="() => DeleteImage(imageData)">حذف</button>
+                    </div>
+                </div>
+            </div>
+        }
+    </div>
+
+    @if (isEditModalVisible)
+    {
+        <div class="modal show d-block" tabindex="-1">
+            <div class="modal-dialog">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title">تعديل المنتج</h5>
+                        <button type="button" class="btn-close" @onclick="CloseEditModal"></button>
+                    </div>
+                    <div class="modal-body">
+                        <InputFile OnChange="OnInputFileChange" class="form-control" />
+                        <input type="number" class="form-control mt-2" @bind="editImageData.Price" placeholder="تحديث السعر" />
+                        <input type="text" class="form-control mt-2" @bind="editImageData.Description" placeholder="تحديث الوصف" />
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" @onclick="CloseEditModal">إلغاء</button>
+                        <button type="button" class="btn btn-primary" @onclick="UpdateImage">حفظ التغييرات</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    }
+}
+else
+{
+    <p>لا توجد صور لعرضها.</p>
+}
+
+@code {
+    private List<Models.GetImageResponse> imageDataList;
+    private Models.GetImageResponse editImageData = new Models.GetImageResponse();
+    private bool isEditModalVisible = false;
+    private IBrowserFile uploadedImage;
+    private string tableName;
+    private bool isEditing = false;
+
+    private async Task LoadImages()
+    {
+        tableName = await JS.InvokeAsync<string>("sessionStorage.getItem", "TableName");
+
+        if (!string.IsNullOrEmpty(tableName))
+        {
+            try
+            {
+                imageDataList = await Http.GetFromJsonAsync<List<Models.GetImageResponse>>($"https://localhost:7252/Control/GetImages?tableName={tableName}");
+                isEditing = false;
+            }
+            catch (HttpRequestException ex)
+            {
+                Console.WriteLine($"Request error: {ex.Message}");
+            }
+        }
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadImages();
+    }
+
+    private void EditImage(Models.GetImageResponse imageData)
+    {
+        editImageData = imageData;
+        isEditModalVisible = true;
+        isEditing = true;
+    }
+
+    private void CloseEditModal()
+    {
+        isEditModalVisible = false;
+        editImageData = new Models.GetImageResponse();
+    }
+
+    private async Task OnInputFileChange(InputFileChangeEventArgs e)
+    {
+        uploadedImage = e.File;
+    }
+
+    private async Task<string> UploadImageToServer()
+    {
+        editImageData.TableName = tableName;
+        try
+        {
+            if (uploadedImage == null)
+            {
+                Console.WriteLine("الصورة غير موجودة للرفع.");
+                return null;
+            }
+
+            using var content = new MultipartFormDataContent();
+            using var stream = uploadedImage.OpenReadStream();
+            var fileContent = new StreamContent(stream);
+            fileContent.Headers.ContentType = new MediaTypeHeaderValue(uploadedImage.ContentType);
+
+            var uniqueImageName = $"{editImageData.Item}_{DateTime.Now:yyyyMMddHHmmss}_{uploadedImage.Name}";
+            content.Add(fileContent, "file", uniqueImageName);
+
+            var uploadPath = $"https://localhost:7252/Control/UploadImage?folder={editImageData.TableName}";
+            Console.WriteLine($"Uploading to: {uploadPath}");
+
+            var response = await Http.PostAsync(uploadPath, content);
+            await Task.Delay(500);
+            if (response.IsSuccessStatusCode)
+            {
+                Console.WriteLine("تم رفع الصورة بنجاح.");
+                return uniqueImageName;
+            }
+            else
+            {
+                var errorResponse = await response.Content.ReadAsStringAsync();
+                Console.WriteLine($"خطأ في رفع الصورة: {errorResponse}");
+                return null;
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"خطأ أثناء رفع الصورة: {ex.Message}");
+            return null;
+        }
+    }
+
+    private async Task UpdateImage()
+    {
+        editImageData.TableName = tableName;
+
+
+        if (uploadedImage != null)
+        {
+            var imageName = await UploadImageToServer();
+            if (!string.IsNullOrEmpty(imageName))
+            {
+                editImageData.ImageName = imageName;
+            }
+        }
+
+        var response = await Http.PutAsJsonAsync("https://localhost:7252/Control/UpdateImage", editImageData);
+
+        if (response.IsSuccessStatusCode)
+        {
+            Console.WriteLine("تم تحديث البيانات بنجاح.");
+            await LoadImages();
+        }
+        else
+        {
+            var errorResponse = await response.Content.ReadAsStringAsync();
+            Console.WriteLine($"فشل في تحديث البيانات: {errorResponse}");
+        }
+
+        CloseEditModal();
+    }
+
+    private async Task DeleteImage(Models.GetImageResponse imageData)
+    {
+        var confirmation = await JS.InvokeAsync<bool>("confirm", $"هل أنت متأكد أنك تريد حذف الصورة {imageData.Item}؟");
+        if (confirmation)
+        {
+            var fileName = imageData.ImageName; // تأكد من وجود القيمة الصحيحة
+            var folder = tableName; // تأكد من أن لديك القيمة الصحيحة
+            var item = imageData.Item;
+
+
+            var response = await Http.DeleteAsync($"https://localhost:7252/Control/DeleteImage?fileName={fileName}&folder={folder}&item={item}");
+            if (response.IsSuccessStatusCode)
+            {
+                Console.WriteLine("تم حذف الصورة بنجاح.");
+                await LoadImages(); // إعادة تحميل الصور بعد الحذف
+            }
+            else
+            {
+                var errorResponse = await response.Content.ReadAsStringAsync();
+                Console.WriteLine($"فشل في حذف الصورة: {errorResponse}");
+            }
+        }
+    }
+
+   // private string GetImagePath(Models.GetImageResponse imageData)
+    //{
+    //    return $"https://localhost:7252/uploads/{imageData.TableName}/{imageData.ImageName}";
+    //}
+
+
+
+
+    private string GetImagePath(Models.GetImageResponse imageData)
+    {
+
+        string imagePath = imageData.ImageName;
+        if (imagePath.StartsWith("/uploads/"))
+        {
+            return $"https://localhost:7252{imagePath}";
+        }
+        else
+        {
+            return $"https://localhost:7252/uploads/{imageData.TableName}/{imageData.ImageName}";
+        }
+        // تأكد من أن الصورة موجودة
+       /* if (string.IsNullOrEmpty(imageData.ImageName))
+        {
+            return "https://localhost:7252/uploads/default-image.png"; // صورة افتراضية إذا لم توجد صورة
+        }
+
+        // بناء المسار بناءً على المعلومات المتاحة
+        return $"https://localhost:7252/{imageData.TableName}/{imageData.ImageName}?t={DateTime.Now.Ticks}";
+
+       */
+    }
+}
+ *@
+
+            @page "/display-images"
+@using Microsoft.AspNetCore.Components.Forms
+@using System.Net.Http.Headers
+@inject HttpClient Http
+@inject IJSRuntime JS
+@inject NavigationManager NavigationManager
+
+<h3>معرض الصور</h3>
+
+@if (imageDataList != null && imageDataList.Count > 0)
+{
+    <div class="row">
+        @foreach (var imageData in imageDataList)
+        {
+            <div class="col-md-4">
+                <div class="card mb-4">
+                    <img src="@GetImagePath(imageData)" class="card-img-top" alt="صورة @imageData.Item" />
+                    <div class="card-body">
+                        <h5 class="card-title">@imageData.Item</h5>
+                        <p class="card-text">الوصف: @imageData.Description</p>
+                        <p class="card-text">السعر: @imageData.Price</p>
+                        <p class="card-text">الكمية: @imageData.Quantity</p>
+                        <button class="btn btn-primary" @onclick="() => EditImage(imageData)">تعديل</button>
+                        <button class="btn btn-danger" @onclick="() => DeleteImage(imageData)">حذف</button>
+                    </div>
+                </div>
+            </div>
+        }
+    </div>
+
+    @if (isEditModalVisible)
+    {
+        <div class="modal show d-block" tabindex="-1">
+            <div class="modal-dialog">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title">تعديل المنتج</h5>
+                        <button type="button" class="btn-close" @onclick="CloseEditModal"></button>
+                    </div>
+                    <div class="modal-body">
+                        <InputFile OnChange="OnInputFileChange" class="form-control" />
+                        <input type="number" class="form-control mt-2" @bind="editImageData.Price" placeholder="تحديث السعر" />
+                        <input type="text" class="form-control mt-2" @bind="editImageData.Description" placeholder="تحديث الوصف" />
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" @onclick="CloseEditModal">إلغاء</button>
+                        <button type="button" class="btn btn-primary" @onclick="UpdateImage">حفظ التغييرات</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    }
+}
+else
+{
+    <p>لا توجد صور لعرضها.</p>
+}
+
+@code {
+    private List<Models.GetImageResponse> imageDataList;
+    private Models.GetImageResponse editImageData = new Models.GetImageResponse();
+    private bool isEditModalVisible = false;
+    private IBrowserFile uploadedImage;
+    private string tableName;
+
+    private async Task LoadImages()
+    {
+        // الحصول على اسم الجدول من sessionStorage
+        tableName = await JS.InvokeAsync<string>("sessionStorage.getItem", "TableName");
+
+        if (!string.IsNullOrEmpty(tableName))
+        {
+            try
+            {
+                imageDataList = await Http.GetFromJsonAsync<List<Models.GetImageResponse>>($"https://localhost:7252/Control/GetImages?tableName={tableName}");
+            }
+            catch (HttpRequestException ex)
+            {
+                Console.WriteLine($"Request error: {ex.Message}");
+            }
+        }
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadImages();
+    }
+
+    private void EditImage(Models.GetImageResponse imageData)
+    {
+        // إعداد البيانات للتعديل
+        editImageData = imageData;
+        editImageData.OldImageName = imageData.ImageName; // تعيين اسم الصورة القديمة
+        isEditModalVisible = true;
+    }
+
+    private void CloseEditModal()
+    {
+        // إغلاق نافذة التعديل
+        isEditModalVisible = false;
+        editImageData = new Models.GetImageResponse();
+    }
+
+    private async Task OnInputFileChange(InputFileChangeEventArgs e)
+    {
+        // التعامل مع تغيير الملف المدخل
+        uploadedImage = e.File;
+    }
+
+    private async Task<string> UploadImageToServer()
+    {
+        editImageData.TableName = tableName; // تعيين اسم الجدول
+        try
+        {
+            if (uploadedImage == null)
+            {
+                Console.WriteLine("الصورة غير موجودة للرفع.");
+                return null;
+            }
+
+            using var content = new MultipartFormDataContent();
+            using var stream = uploadedImage.OpenReadStream();
+            var fileContent = new StreamContent(stream);
+            fileContent.Headers.ContentType = new MediaTypeHeaderValue(uploadedImage.ContentType);
+
+            // توليد اسم فريد للصورة
+            var uniqueImageName = $"{editImageData.Item}_{DateTime.Now:yyyyMMddHHmmss}_{uploadedImage.Name}";
+            content.Add(fileContent, "file", uniqueImageName);
+
+            var uploadPath = $"https://localhost:7252/Control/UploadImage?folder={editImageData.TableName}";
+            Console.WriteLine($"Uploading to: {uploadPath}");
+
+            var response = await Http.PostAsync(uploadPath, content);
+            await Task.Delay(500);
+            if (response.IsSuccessStatusCode)
+            {
+                Console.WriteLine("تم رفع الصورة بنجاح.");
+                return uniqueImageName;
+            }
+            else
+            {
+                var errorResponse = await response.Content.ReadAsStringAsync();
+                Console.WriteLine($"خطأ في رفع الصورة: {errorResponse}");
+                return null;
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"خطأ أثناء رفع الصورة: {ex.Message}");
+            return null;
+        }
+    }
+
+    private async Task UpdateImage()
+    {
+        editImageData.TableName = tableName; // تعيين اسم الجدول
+
+        if (uploadedImage != null)
+        {
+            // إذا تم تحميل صورة جديدة، رفعها إلى الخادم
+            var imageName = await UploadImageToServer();
+            if (!string.IsNullOrEmpty(imageName))
+            {
+                editImageData.ImageName = imageName; // تعيين اسم الصورة الجديدة
+            }
+        }
+
+        var response = await Http.PutAsJsonAsync("https://localhost:7252/Control/UpdateImage", editImageData);
+
+        if (response.IsSuccessStatusCode)
+        {
+            Console.WriteLine("تم تحديث البيانات بنجاح.");
+            await LoadImages(); // إعادة تحميل الصور بعد التحديث
+        }
+        else
+        {
+            var errorResponse = await response.Content.ReadAsStringAsync();
+            Console.WriteLine($"فشل في تحديث البيانات: {errorResponse}");
+        }
+
+        CloseEditModal();
+    }
+
+    private async Task DeleteImage(Models.GetImageResponse imageData)
+    {
+        var confirmation = await JS.InvokeAsync<bool>("confirm", $"هل أنت متأكد أنك تريد حذف الصورة {imageData.Item}؟");
+        if (confirmation)
+        {
+            var fileName = imageData.ImageName; // تأكد من وجود القيمة الصحيحة
+            var folder = tableName; // تأكد من أن لديك القيمة الصحيحة
+            var item = imageData.Item;
+
+            var response = await Http.DeleteAsync($"https://localhost:7252/Control/DeleteImage?fileName={fileName}&folder={folder}&item={item}");
+            if (response.IsSuccessStatusCode)
+            {
+                Console.WriteLine("تم حذف الصورة بنجاح.");
+                await LoadImages(); // إعادة تحميل الصور بعد الحذف
+            }
+            else
+            {
+                var errorResponse = await response.Content.ReadAsStringAsync();
+                Console.WriteLine($"فشل في حذف الصورة: {errorResponse}");
+            }
+        }
+    }
+
+    private string GetImagePath(Models.GetImageResponse imageData)
+    {
+        // الحصول على مسار الصورة
+        string imagePath = imageData.ImageName;
+        if (imagePath.StartsWith("/uploads/"))
+        {
+            return $"https://localhost:7252{imagePath}";
+        }
+        else
+        {
+            return $"https://localhost:7252/uploads/{imageData.TableName}/{imageData.ImageName}";
+        }
+    }
+}

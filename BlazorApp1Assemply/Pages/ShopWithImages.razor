@@ -1,0 +1,321 @@
+﻿@* @page "/ShopsWithImages"
+@using System.Net.Http.Json
+@using System.Text.Json
+@inject HttpClient Http
+
+@code {
+    private List<Shop> ShopsWithImages = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        var response = await Http.GetAsync("https://localhost:7252/Control/GetAllShopsWithImages");
+        if (response.IsSuccessStatusCode)
+        {
+            var jsonResponse = await response.Content.ReadAsStringAsync();
+            ShopsWithImages = JsonSerializer.Deserialize<List<Shop>>(jsonResponse, new JsonSerializerOptions
+                {
+                    PropertyNameCaseInsensitive = true
+                });
+        }
+        else
+        {
+            // سجل الخطأ أو اعرض رسالة للمستخدم
+            Console.WriteLine($"Error: {response.StatusCode}");
+        }
+    }
+
+    public class Shop
+    {
+        public string tableName { get; set; }
+        public string ShopName { get; set; }
+        public string Address { get; set; }
+        public string NerestPoint { get; set; }
+        public List<ImageItem> Images { get; set; }
+    }
+
+    public class ImageItem
+    {
+        public string Item { get; set; }
+        public string Description { get; set; }
+        public decimal Price { get; set; }
+        public int Quantity { get; set; }
+        public string ImageName { get; set; }
+    }
+}
+
+<div class="container mt-5">
+    <div class="row">
+        @foreach (var shop in ShopsWithImages)
+        {
+            <div class="col-md-6 mb-4">
+                <div class="card shadow-sm">
+                    <div class="card-header bg-primary text-white">
+                        <h5 class="card-title">@shop.ShopName</h5>
+                        <p class="card-subtitle">
+                            <small class="text-white">@shop.Address</small><br />
+                            <small class="text-white">أقرب نقطة: @shop.NerestPoint</small>
+                        </p>
+                    </div>
+                    <div class="card-body">
+                        <ul class="list-group list-group-flush">
+                            @foreach (var image in shop.Images)
+                            {
+                                <li class="list-group-item d-flex align-items-start">
+                                    <img src="@($"{image.ImageName}")" alt="@image.Item" class="img-thumbnail me-3" style="width: 80px; height: 80px;" />
+                                  @*   <img src="@image.ImageName" alt="@image.Item" class="img-thumbnail me-3" style="width: 80px; height: 80px;" /> *@
+                                   @*  <div>
+                                        <h6>@image.Item</h6>
+                                        <p>@image.Description</p>
+                                        <small>السعر: @image.Price | الكمية: @image.Quantity</small>
+                                    </div> *@
+                            @*     </li>
+                            }
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        }
+    </div>
+</div> *@
+ 
+
+@* @page "/ShopsWithImages"
+@using System.Net.Http.Json
+@using System.Text.Json
+@inject HttpClient Http
+@implements IAsyncDisposable
+
+@code {
+    private List<Shop> ShopsWithImages = new();
+    private int currentImageIndex = 0;
+    private bool isLoaded = false;
+    private Timer? imageTimer;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var response = await Http.GetAsync("https://localhost:7252/Control/GetAllShopsWithImages");
+        if (response.IsSuccessStatusCode)
+        {
+            var jsonResponse = await response.Content.ReadAsStringAsync();
+            ShopsWithImages = JsonSerializer.Deserialize<List<Shop>>(jsonResponse, new JsonSerializerOptions
+                {
+                    PropertyNameCaseInsensitive = true
+                });
+            isLoaded = true;
+        }
+        else
+        {
+            Console.WriteLine($"Error: {response.StatusCode}");
+        }
+    }
+
+    private void StartImageRotation()
+    {
+        imageTimer = new Timer(RotateImage, null, 0, 10000); // Rotate every 10 seconds
+    }
+
+    private void RotateImage(object? state)
+    {
+        var imageCount = ShopsWithImages.FirstOrDefault()?.Images.Count ?? 0; // إذا كانت null سيتم إعطاء 0
+        currentImageIndex = (currentImageIndex + 1) % imageCount;  // استخدام count بطريقة آمنة
+        InvokeAsync(StateHasChanged); // Refresh the UI to show next image
+    }
+
+    public ValueTask DisposeAsync()
+    {
+        imageTimer?.Dispose();
+        return ValueTask.CompletedTask;
+    }
+
+    public class Shop
+    {
+        public string tableName { get; set; }
+        public string ShopName { get; set; }
+        public string Address { get; set; }
+        public string NerestPoint { get; set; }
+        public List<ImageItem> Images { get; set; }
+    }
+
+    public class ImageItem
+    {
+        public string Item { get; set; }
+        public string Description { get; set; }
+        public decimal Price { get; set; }
+        public int Quantity { get; set; }
+        public string ImageName { get; set; }
+    }
+}
+
+<div class="container mt-5">
+    <div class="row">
+        @foreach (var shop in ShopsWithImages)
+        {
+            <div class="col-md-6 mb-4">
+                <div class="card shadow-sm">
+                    <div class="card-header bg-primary text-white">
+                        <h5 class="card-title">@shop.ShopName</h5>
+                        <p class="card-subtitle">
+                            <small class="text-white">@shop.Address</small><br />
+                            <small class="text-white">أقرب نقطة: @shop.NerestPoint</small>
+                        </p>
+                    </div>
+                    <div class="card-body">
+                        <div class="image-container">
+                            @if (isLoaded && shop.Images.Count > 0)
+                            {
+                                <img src="@shop.Images[currentImageIndex].ImageName"
+                                     alt="@shop.Images[currentImageIndex].Item"
+                                     class="img-fluid" style="max-height: 300px; object-fit: cover;" />
+                            }
+                        </div>
+                    </div>
+                </div>
+            </div>
+        }
+    </div>
+</div>
+
+@code {
+    protected override Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            StartImageRotation();
+        }
+        return base.OnAfterRenderAsync(firstRender);
+    }
+}
+ *@
+
+
+ @page "/ShopsWithImages"
+@using System.Net.Http.Json
+@using System.Text.Json
+@inject HttpClient Http
+
+
+ 
+@inject IJSRuntime JS
+@inject NavigationManager NavigationManager
+
+
+@code {
+    private List<Shop> ShopsWithImages = new();
+    private int currentImageIndex = 0; // تعقب الصورة الحالية
+    private Timer? imageTimer;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var response = await Http.GetAsync("https://localhost:7252/Control/GetAllShopsWithImages");
+        if (response.IsSuccessStatusCode)
+        {
+            var jsonResponse = await response.Content.ReadAsStringAsync();
+            ShopsWithImages = JsonSerializer.Deserialize<List<Shop>>(jsonResponse, new JsonSerializerOptions
+                {
+                    PropertyNameCaseInsensitive = true
+                });
+
+            // بدء التوقيت لتغيير الصور
+            StartImageRotation();
+        }
+        else
+        {
+            Console.WriteLine($"Error: {response.StatusCode}");
+        }
+    }
+
+    private async Task AddSessionTableNameGoToTable(string tablename)
+    {
+        // حفظ القيم في sessionStorage
+        //  await JS.InvokeVoidAsync("sessionStorage.setItem", "mCode", mCode);
+        //  await JS.InvokeVoidAsync("sessionStorage.setItem", "city", city);
+        //  await JS.InvokeVoidAsync("sessionStorage.setItem", "lastStore", lastStore);
+        await JS.InvokeVoidAsync("sessionStorage.setItem", "TableName", tablename);
+
+
+        // إعادة التوجيه إلى صفحة التفاصيل
+        NavigationManager.NavigateTo("/display-images-for-customer");
+    }
+
+    private async Task addBasket(string tablename)
+    {
+        // حفظ القيم في sessionStorage
+        //  await JS.InvokeVoidAsync("sessionStorage.setItem", "mCode", mCode);
+        //  await JS.InvokeVoidAsync("sessionStorage.setItem", "city", city);
+        //  await JS.InvokeVoidAsync("sessionStorage.setItem", "lastStore", lastStore);
+        await JS.InvokeVoidAsync("sessionStorage.setItem", "TableName", tablename);
+
+
+        // إعادة التوجيه إلى صفحة التفاصيل
+        NavigationManager.NavigateTo("/display-images-for-customer");
+    }
+
+    private void StartImageRotation()
+    {
+        // تحديد الوقت الذي سيحدث فيه التبديل (كل 10 ثوانٍ)
+        imageTimer = new Timer(RotateImage, null, TimeSpan.Zero, TimeSpan.FromSeconds(3));
+    }
+
+    private void RotateImage(object? state)
+    {
+        var shopWithImages = ShopsWithImages.FirstOrDefault();
+        var imageCount = shopWithImages?.Images.Count ?? 0;
+
+        if (imageCount > 0)
+        {
+            currentImageIndex = (currentImageIndex + 1) % imageCount; // التبديل بين الصور
+            InvokeAsync(StateHasChanged); // تحديث الواجهة
+        }
+    }
+
+    public class Shop
+    {
+        public string tableName { get; set; }
+        public string ShopName { get; set; }
+        public string Address { get; set; }
+        public string NerestPoint { get; set; }
+        public List<ImageItem> Images { get; set; }
+    }
+
+    public class ImageItem
+    {
+        public int Id { get; set; }
+        public string Item { get; set; }
+        public string Description { get; set; }
+        public decimal Price { get; set; }
+        public int Quantity { get; set; }
+        public string ImageName { get; set; }
+    }
+}
+
+<div class="container mt-5">
+    <div class="row">
+        @foreach (var shop in ShopsWithImages)
+        {
+            <div class="col-md-6 mb-4">
+                <div class="card shadow-sm">
+                    <div class="card-header bg-primary text-white">
+                        <h5 class="card-title">@shop.ShopName</h5>
+                        <p class="card-subtitle">
+                            <small class="text-white">@shop.Address</small><br />
+                            <small class="text-white">أقرب نقطة: @shop.NerestPoint</small>
+                        </p>
+                    </div>
+                    <div class="card-body">
+                        <div class="image-carousel">
+                            @if (shop.Images.Count > 0)
+                            {
+                                <!-- إضافة تحقق من أن الفهرس ضمن النطاق -->
+                                <img src="@shop.Images[Math.Min(currentImageIndex, shop.Images.Count - 1)].ImageName"
+                                     alt="@shop.Images[Math.Min(currentImageIndex, shop.Images.Count - 1)].Item"
+                                     class="img-thumbnail" style="width: 100%; height: auto;" />
+                            }
+                        </div>
+                      
+                        <button type="button" @onclick="() => AddSessionTableNameGoToTable(shop.tableName)" class="btn btn-primary">الدهاب الي المحل</button>
+                    </div>
+                </div>
+            </div>
+        }
+    </div>
+</div>

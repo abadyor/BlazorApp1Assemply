@@ -1,0 +1,374 @@
+﻿  @page "/display-images-for-customer"
+@using Microsoft.AspNetCore.Components.Forms
+@using System.Net.Http.Headers
+@inject HttpClient Http
+@inject IJSRuntime JS
+@inject NavigationManager NavigationManager
+@using System.Text.Json
+
+<h3>معرض الصور</h3>
+
+@if (imageDataList != null && imageDataList.Count > 0)
+{
+    <div class="row">
+        @foreach (var imageData in imageDataList)
+        {
+            <div class="col-md-4">
+                <div class="card mb-4">
+                    <img src="@GetImagePath(imageData)" class="card-img-top" alt="صورة @imageData.Item" />
+                    <div class="card-body">
+                        <h5 class="card-title">@imageData.Item</h5>
+                        <p class="card-text">الوصف: @imageData.Description</p>
+                        <p class="card-text">السعر: @imageData.Price</p>
+                        <p class="card-text">الكمية: @imageData.Quantity</p>
+                        @if (!ShowButtonAddBasket)
+                        {
+                            <button class="btn btn-primary" @onclick="() => addBasket(imageData.Id,imageData.Item,imageData.Description,imageData.Price)" disabled="@(ShowButtonAddBasket)">اضف الي السلة</button>
+                        }else
+                        {
+                            <button class="btn btn-primary" @onclick="async () => await messageAlert()">اضف الي السلة </button>
+                         
+                        }
+                       
+                      @*   <button class="btn btn-primary" @onclick="() => addBasket(imageData.Id,)">تعديل</button> *@
+@*                         <button class="btn btn-primary" @onclick="() => EditImage(imageData)">تعديل</button>
+                        <button class="btn btn-danger" @onclick="() => DeleteImage(imageData)">حذف</button> *@
+                    </div>
+                </div>
+            </div>
+        }
+
+
+      
+
+      @*   @if (showAlert)
+        {
+            <div class="alert alert-success alert-dismissible fade show mt-3" role="alert">
+                <strong>نجاح!</strong> تم تنفيذ العملية بنجاح.
+                <button type="button" class="btn-close" @onclick="CloseAlert" aria-label="Close"></button>
+            </div>
+        } *@
+        @if (showAlert)
+        {
+            <div class="custom-alert" @onclick="CloseAlert">يوجد لديك سلة لم تاكد الرجاء تاكيدها لفتح سلة جديدة!</div>
+        }
+    </div>
+
+
+  @*   @if (isEditModalVisible)
+    {
+        <div class="modal show d-block" tabindex="-1">
+            <div class="modal-dialog">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title">تعديل المنتج</h5>
+                        <button type="button" class="btn-close" @onclick="CloseEditModal"></button>
+                    </div>
+                    <div class="modal-body">
+                        <InputFile OnChange="OnInputFileChange" class="form-control" />
+                        <input type="number" class="form-control mt-2" @bind="editImageData.Price" placeholder="تحديث السعر" />
+                        <input type="text" class="form-control mt-2" @bind="editImageData.Description" placeholder="تحديث الوصف" />
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" @onclick="CloseEditModal">إلغاء</button>
+                        <button type="button" class="btn btn-primary" @onclick="UpdateImage">حفظ التغييرات</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    } *@
+}
+else
+{
+    <p>لا توجد صور لعرضها.</p>
+}
+
+@code {
+    private List<Models.GetImageResponse> imageDataList;
+    private Models.GetImageResponse editImageData = new Models.GetImageResponse();
+    private bool isEditModalVisible = false;
+    private IBrowserFile uploadedImage;
+    private string tableName;
+    private int id_customer;
+    private bool ShowButtonAddBasket;
+    private bool showAlert = false;
+
+    public class ApiResponse<T>
+    {
+        public int StatusCode { get; set; }
+        public bool Succeeded { get; set; }
+        public string Message { get; set; }
+        public T Data { get; set; }
+    }
+
+
+
+    private async Task LoadImages()
+    {
+        // الحصول على اسم الجدول من sessionStorage
+        tableName = await JS.InvokeAsync<string>("sessionStorage.getItem", "TableName");
+
+
+        if (!string.IsNullOrEmpty(tableName))
+        {
+            try
+            {
+                imageDataList = await Http.GetFromJsonAsync<List<Models.GetImageResponse>>($"https://localhost:7252/Control/GetImages?tableName={tableName}");
+            }
+            catch (HttpRequestException ex)
+            {
+                Console.WriteLine($"Request error: {ex.Message}");
+            }
+        }
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+
+        id_customer = Convert.ToInt32(await JS.InvokeAsync<string>("sessionStorage.getItem", "id_customer"));
+        await showButton(id_customer);
+
+       // ShowButtonAddBasket = Convert.ToBoolean(await JS.InvokeAsync<string>("sessionStorage.getItem", "ShowButtonAddBasket"));
+
+        await LoadImages();
+    }
+
+    private async Task showButton(int id_customer)
+    {   
+        if (id_customer != 0)
+        {
+            try
+            {
+                var responseBasket = await Http.GetFromJsonAsync<ApiResponse<Models.GetEndRowResponse>>($"https://localhost:7252/Basket/CheckBasketForInsert?customerId={id_customer}");
+                if (responseBasket.Data == null)
+                {
+                    ShowButtonAddBasket = false;
+                }
+                else
+                {
+                    ShowButtonAddBasket = true;
+                }
+
+                //await JS.InvokeVoidAsync("sessionStorage.setItem", "ShowButtonAddBasket", JsonSerializer.Serialize(ShowButtonAddBasket));
+
+            }
+            catch (HttpRequestException ex) when (ex.StatusCode == System.Net.HttpStatusCode.NotFound)
+            {
+                Console.WriteLine("مشكلة عند تحميل ");
+            }
+
+        }
+    }
+
+    private void EditImage(Models.GetImageResponse imageData)
+    {
+        // إعداد البيانات للتعديل
+        editImageData = imageData;
+        editImageData.OldImageName = imageData.ImageName; // تعيين اسم الصورة القديمة
+        isEditModalVisible = true;
+    }
+
+    private void CloseEditModal()
+    {
+        // إغلاق نافذة التعديل
+        isEditModalVisible = false;
+        editImageData = new Models.GetImageResponse();
+    }
+
+    private async Task OnInputFileChange(InputFileChangeEventArgs e)
+    {
+        // التعامل مع تغيير الملف المدخل
+        uploadedImage = e.File;
+    }
+
+    private async Task<string> UploadImageToServer()
+    {
+        editImageData.TableName = tableName; // تعيين اسم الجدول
+        try
+        {
+            if (uploadedImage == null)
+            {
+                Console.WriteLine("الصورة غير موجودة للرفع.");
+                return null;
+            }
+
+            using var content = new MultipartFormDataContent();
+            using var stream = uploadedImage.OpenReadStream();
+            var fileContent = new StreamContent(stream);
+            fileContent.Headers.ContentType = new MediaTypeHeaderValue(uploadedImage.ContentType);
+
+            // توليد اسم فريد للصورة
+            var uniqueImageName = $"{editImageData.Item}_{DateTime.Now:yyyyMMddHHmmss}_{uploadedImage.Name}";
+            content.Add(fileContent, "file", uniqueImageName);
+
+            var uploadPath = $"https://localhost:7252/Control/UploadImage?folder={editImageData.TableName}";
+            Console.WriteLine($"Uploading to: {uploadPath}");
+
+            var response = await Http.PostAsync(uploadPath, content);
+            await Task.Delay(500);
+            if (response.IsSuccessStatusCode)
+            {
+                Console.WriteLine("تم رفع الصورة بنجاح.");
+                return uniqueImageName;
+            }
+            else
+            {
+                var errorResponse = await response.Content.ReadAsStringAsync();
+                Console.WriteLine($"خطأ في رفع الصورة: {errorResponse}");
+                return null;
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"خطأ أثناء رفع الصورة: {ex.Message}");
+            return null;
+        }
+    }
+
+    private async Task UpdateImage()
+    {
+        editImageData.TableName = tableName; // تعيين اسم الجدول
+
+        if (uploadedImage != null)
+        {
+            // إذا تم تحميل صورة جديدة، رفعها إلى الخادم
+            var imageName = await UploadImageToServer();
+            if (!string.IsNullOrEmpty(imageName))
+            {
+                editImageData.ImageName = imageName; // تعيين اسم الصورة الجديدة
+            }
+        }
+
+        var response = await Http.PutAsJsonAsync("https://localhost:7252/Control/UpdateImage", editImageData);
+
+        if (response.IsSuccessStatusCode)
+        {
+            Console.WriteLine("تم تحديث البيانات بنجاح.");
+            await LoadImages(); // إعادة تحميل الصور بعد التحديث
+        }
+        else
+        {
+            var errorResponse = await response.Content.ReadAsStringAsync();
+            Console.WriteLine($"فشل في تحديث البيانات: {errorResponse}");
+        }
+
+        CloseEditModal();
+    }
+
+    private async Task DeleteImage(Models.GetImageResponse imageData)
+    {
+        var confirmation = await JS.InvokeAsync<bool>("confirm", $"هل أنت متأكد أنك تريد حذف الصورة {imageData.Item}؟");
+        if (confirmation)
+        {
+            var fileName = imageData.ImageName; // تأكد من وجود القيمة الصحيحة
+            var folder = tableName; // تأكد من أن لديك القيمة الصحيحة
+            var item = imageData.Item;
+
+            var response = await Http.DeleteAsync($"https://localhost:7252/Control/DeleteImage?fileName={fileName}&folder={folder}&item={item}");
+            if (response.IsSuccessStatusCode)
+            {
+                Console.WriteLine("تم حذف الصورة بنجاح.");
+                await LoadImages(); // إعادة تحميل الصور بعد الحذف
+            }
+            else
+            {
+                var errorResponse = await response.Content.ReadAsStringAsync();
+                Console.WriteLine($"فشل في حذف الصورة: {errorResponse}");
+            }
+        }
+    }
+
+    private string GetImagePath(Models.GetImageResponse imageData)
+    {
+        // الحصول على مسار الصورة
+        string imagePath = imageData.ImageName;
+        if (imagePath.StartsWith("/uploads/"))
+        {
+            return $"https://localhost:7252{imagePath}";
+        }
+        else
+        {
+            return $"https://localhost:7252/uploads/{imageData.TableName}/{imageData.ImageName}";
+        }
+    }
+
+    private void addBasket(int itemId,string Item ,string  Description, decimal Price)
+    {
+        // هنا يمكنك إضافة منطق الزر الأول
+        JS.InvokeVoidAsync("sessionStorage.setItem", "itemId", itemId);
+        JS.InvokeVoidAsync("sessionStorage.setItem", "Item", Item);
+        JS.InvokeVoidAsync("sessionStorage.setItem", "Description", Description);
+        JS.InvokeVoidAsync("sessionStorage.setItem", "Price", Price);
+        //NavigationManager.NavigateTo("/Basket_s");
+        NavigationManager.NavigateTo("/BasketAndBasket_s");
+    }
+    private async Task messageAlert()
+    {
+        showAlert = true;
+        StateHasChanged(); // تحديث واجهة المستخدم بعد تغيير حالة showAlert
+        await Task.Delay(3000); // فترة الانتظار قبل إغلاق التنبيه
+        showAlert = false;
+        StateHasChanged(); // تحديث واجهة المستخدم بعد إغلاق التنبيه
+    }
+
+   
+
+    private void CloseAlert()
+    {
+        showAlert = false;
+        StateHasChanged();
+    }
+}
+<style>
+    .custom-alert {
+        position: fixed;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        background: linear-gradient(135deg, #ff9800, #ff5722); /* تدرج لوني */
+        color: white;
+        padding: 20px 30px;
+        border-radius: 12px; /* زوايا مستديرة خفيفة */
+        box-shadow: 0px 8px 15px rgba(0, 0, 0, 0.3);
+        font-size: 1.2em;
+        font-weight: bold;
+        z-index: 1050;
+        transition: opacity 0.3s ease, transform 0.3s ease; /* إضافة انتقال للتغيير */
+        opacity: 1;
+    }
+
+        .custom-alert.fade-out {
+            opacity: 0;
+            transform: translate(-50%, -50%) scale(0.9); /* تأثير التلاشي مع التصغير */
+        }
+
+        .custom-alert .icon {
+            font-size: 1.5em;
+            margin-right: 10px;
+            vertical-align: middle;
+        }
+
+        .custom-alert .message {
+            display: inline-block;
+            vertical-align: middle;
+        }
+
+        .custom-alert .close-btn {
+            position: absolute;
+            top: 8px;
+            right: 8px;
+            font-size: 1.1em;
+            background: transparent;
+            border: none;
+            color: white;
+            cursor: pointer;
+            opacity: 0.8;
+            transition: opacity 0.2s;
+        }
+
+            .custom-alert .close-btn:hover {
+                opacity: 1;
+            }
+
+
+</style>

@@ -1,0 +1,171 @@
+﻿@page "/Basket_s"
+@using System.Net.Http.Json
+@using System.Text.Json
+@inject HttpClient Http
+@inject NavigationManager NavigationManager
+@inject IJSRuntime JS
+<h3 style="text-align: center;">إدخال بيانات السلة</h3>
+
+<div class="form-container">
+    <EditForm Model="@BasketData" OnValidSubmit="HandleValidSubmit">
+        <DataAnnotationsValidator />
+        <ValidationSummary />
+
+        <div class="form-group">
+            <label for="Item">Item:</label>
+            <InputText id="street" @bind-Value="Item" class="form-control" disabled="false" />
+            
+        </div>
+
+        <div class="form-group">
+            <label for="Description">Description:</label>
+            <InputText id="street" @bind-Value="Description" class="form-control" disabled="false" />
+
+        </div>
+
+        <div class="form-group">
+            <label>السعر:</label>
+            <InputNumber @bind-Value="Price" class="form-control" disabled="false" />
+        </div>
+
+        <div class="form-group">
+            <label>الكمية:</label>
+            <InputNumber @bind-Value="BasketData.quantity" class="form-control" />
+        </div>
+
+     
+
+        <div class="form-actions">
+            <button type="submit" class="btn btn-primary">حفظ</button>
+            <button type="button" class="btn btn-secondary" @onclick="ResetForm">إعادة تعيين</button>
+        </div>
+    </EditForm>
+</div>
+
+<style>
+    .form-container {
+        max-width: 400px;
+        margin: 0 auto;
+        padding: 20px;
+        background-color: #f9f9f9;
+        border-radius: 8px;
+        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+    }
+
+    .form-group {
+        margin-bottom: 15px;
+    }
+
+    label {
+        font-weight: bold;
+        margin-bottom: 5px;
+        display: block;
+    }
+
+    .form-actions {
+        display: flex;
+        gap: 10px;
+        justify-content: center;
+    }
+</style>
+
+@code {
+    private Models.Basket_s BasketData = new Models.Basket_s();
+    private Models.Basket BasketData1 = new Models.Basket();
+    private Models.GetEndRowResponse getEndRowResponse=new Models.GetEndRowResponse() ;
+    private Models.GetEndRowResponse getEndRowResponse2 = new Models.GetEndRowResponse();
+    private int itemId;
+    private int id_customer;
+    private string tableName;
+    private string Item;
+    private string Description;
+    private decimal Price;
+    private int BasketId;
+
+    public class Response<T>
+    {
+        public int StatusCode { get; set; }
+        public bool Succeeded { get; set; }
+        public string Message { get; set; }
+        public T Data { get; set; }
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        itemId = Convert.ToInt32(await JS.InvokeAsync<string>("sessionStorage.getItem", "itemId"));
+        id_customer = Convert.ToInt32(await JS.InvokeAsync<string>("sessionStorage.getItem", "id_customer"));
+        tableName = await JS.InvokeAsync<string>("sessionStorage.getItem", "TableName");
+        Item = await JS.InvokeAsync<string>("sessionStorage.getItem", "Item");
+        Description = await JS.InvokeAsync<string>("sessionStorage.getItem", "Description");
+        Price =Convert.ToDecimal( await JS.InvokeAsync<string>("sessionStorage.getItem", "Price"));
+
+
+        BasketData1.customerId = id_customer;
+        BasketData1.TableName = tableName;
+
+        var getEndRowResponse2 = await Http.GetFromJsonAsync<Response<Models.GetEndRowResponse>>("https://localhost:7252/Basket/CheckBasketForInsert?customerId="+ id_customer);
+        if ( getEndRowResponse2.Data == null)
+        {
+
+            var response = await Http.PostAsJsonAsync("https://localhost:7252/Basket/Create", BasketData1);
+
+            if (response.IsSuccessStatusCode)
+            {
+                Console.WriteLine("تم تحديث البيانات بنجاح.");
+                // await Task.Delay(500);
+                try
+                {
+                    // استخدام Response<GetEndRowResponse> لاستدعاء GetEndRow
+                    var getEndRowResponse = await Http.GetFromJsonAsync<Response<Models.GetEndRowResponse>>("https://localhost:7252/Basket/GetEndRow");
+
+                    if (getEndRowResponse != null && getEndRowResponse.Succeeded && getEndRowResponse.Data != null)
+                    {
+                        BasketId = getEndRowResponse.Data.Id;
+                        Console.WriteLine($"تم استرجاع BasketId: {BasketId}");
+                    }
+                    else
+                    {
+                        Console.WriteLine("لم يتم استرجاع قيمة صالحة لـ BasketId.");
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"خطأ في استدعاء GetEndRow: {ex.Message}");
+                }
+            }
+
+        }
+        else
+        {
+            BasketId = getEndRowResponse2.Data.Id;
+        }
+    }
+    private async void HandleValidSubmit()
+    {
+        // هنا يمكنك إضافة كود لحفظ البيانات، مثل استدعاء API
+        BasketData.basketId = BasketId;
+        BasketData.itemId = itemId;
+        
+
+        var response = await Http.PostAsJsonAsync("https://localhost:7252/Basket_s/Create", BasketData);
+
+        if (response.IsSuccessStatusCode)
+        {
+            
+            Console.WriteLine("تم حفظ البيانات بنجاح");
+            NavigationManager.NavigateTo("/ShopsWithImages");
+
+          
+            // ResetForm();
+        }
+        else
+        {
+            Console.WriteLine("لم يتم حفظ البيانات ");
+        }
+    }
+
+    private void ResetForm()
+    {
+        BasketData = new Models.Basket_s(); // إعادة تعيين النموذج
+    }
+}

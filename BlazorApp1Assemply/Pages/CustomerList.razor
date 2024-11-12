@@ -1,0 +1,224 @@
+﻿@* @page "/customer-list"
+@using System.Text.Json
+@inject HttpClient Http
+@inject NavigationManager NavigationManager
+@inject IJSRuntime JS
+<h3>قائمة العملاء</h3>
+
+@if (customers == null)
+{
+    <p><em>جارٍ التحميل...</em></p>
+}
+else
+{
+    <table class="table">
+        <thead>
+            <tr>
+                <th>الاسم</th>
+                <th>الكنية</th>
+                <th>الجنس</th>
+                <th>البريد الإلكتروني</th>
+                <th>الهاتف</th>
+                <th>إجراءات</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var customer in customers)
+            {
+                <tr>
+                    <td>@customer.GivenNames</td>
+                    <td>@customer.Nickname</td>
+                    <td>@customer.Gender</td>
+                    <td>@customer.EmailAddress</td>
+                    <td>@customer.Mobile</td>
+                    <td>
+                        <button class="btn btn-primary" @onclick="() => EditCustomer(customer.Id)">تعديل</button>
+                        <button class="btn btn-danger" @onclick="() => DeleteCustomer(customer.Id)">حذف</button>
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}
+
+@code {
+    private List<Models.Customer> customers;
+    private string errorMessage;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadCustomers();
+    }
+
+    private async Task LoadCustomers()
+    {
+      /*  try
+          {
+              var response = await Http.GetAsync("https://localhost:7252/Customer/Getall");
+              if (response.IsSuccessStatusCode)
+              {
+                 // customers = await response.Content.ReadFromJsonAsync<List<Models.Customer>>();
+                  customers = await Http.GetFromJsonAsync<List<Models.Customer>>("https://localhost:7252/Customer/Getall");
+                  if (customers == null || customers.Count == 0)
+                  {
+                      errorMessage = "لا توجد بيانات للعملاء.";
+                  }
+              }
+              else
+              {
+                  errorMessage = "فشل في تحميل العملاء: " + response.ReasonPhrase;
+              }
+          }
+          catch (Exception ex)
+          {
+              errorMessage = "خطأ أثناء تحميل العملاء: " + ex.Message;
+          }
+          */
+        try
+        {
+            Console.WriteLine("بدء تحميل البيانات...");
+            customers = await Http.GetFromJsonAsync<List<Models.Customer>>("https://localhost:7252/Customer/Getall");
+
+            if (customers == null || customers.Count == 0)
+            {
+                errorMessage = "لا توجد بيانات للعملاء.";
+                Console.WriteLine(errorMessage);
+            }
+            else
+            {
+                Console.WriteLine($"تم تحميل {customers.Count} عميل.");
+            }
+        }
+        catch (HttpRequestException httpEx)
+        {
+            errorMessage = "خطأ في الاتصال بالخادم: " + httpEx.Message;
+            Console.WriteLine(errorMessage);
+        }
+        catch (JsonException jsonEx)
+        {
+            errorMessage = "خطأ في تحليل البيانات: " + jsonEx.Message;
+            Console.WriteLine(errorMessage);
+        }
+        catch (Exception ex)
+        {
+            errorMessage = "خطأ غير متوقع: " + ex.Message;
+            Console.WriteLine(errorMessage);
+        }
+    }
+
+
+    private void EditCustomer(int id)
+    {
+        // توجيه المستخدم إلى صفحة تعديل العميل مع معرف العميل
+        NavigationManager.NavigateTo($"/edit-customer/{id}");
+    }
+
+    private async Task DeleteCustomer(int id)
+    {
+        var response = await Http.DeleteAsync($"https://localhost:7252/Customer/Delete/{id}");
+        if (response.IsSuccessStatusCode)
+        {
+            await LoadCustomers(); // إعادة تحميل القائمة بعد الحذف
+        }
+    }
+}
+
+ *@
+
+    @page "/customer-list"
+@using System.Text.Json
+@inject HttpClient Http
+@inject NavigationManager NavigationManager
+@inject IJSRuntime JS
+
+<h3>قائمة العملاء</h3>
+
+@if (customers == null)
+{
+    <p><em>جارٍ التحميل...</em></p>
+}
+else
+{
+    <table class="table">
+        <thead>
+            <tr>
+                <th>الاسم</th>
+                <th>الكنية</th>
+                <th>الجنس</th>
+                <th>البريد الإلكتروني</th>
+                <th>الهاتف</th>
+                <th>إجراءات</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var customer in customers)
+            {
+                <tr>
+                    <td>@customer.GivenNames</td>
+                    <td>@customer.Nickname</td>
+                    <td>@customer.Gender</td>
+                    <td>@customer.EmailAddress</td>
+                    <td>@customer.Mobile</td>
+                    <td>
+                        <button class="btn btn-primary" @onclick="() => EditCustomer(customer.Id)">تعديل</button>
+                        <button class="btn btn-danger" @onclick="() => DeleteCustomer(customer.Id)">حذف</button>
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}
+
+@code {
+    private List<Models.Customer> customers;
+    private string errorMessage;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadCustomers();
+    }
+
+    private async Task LoadCustomers()
+    {
+        try
+        {
+            // قراءة الاستجابة كـ ApiResponse<List<Customer>>
+            var apiResponse = await Http.GetFromJsonAsync<Models.ApiResponse<List<Models.Customer>>>("https://localhost:7252/Customer/Getall");
+
+            if (apiResponse != null && apiResponse.Succeeded && apiResponse.Data != null)
+            {
+                customers = apiResponse.Data;
+            }
+            else
+            {
+                errorMessage = apiResponse?.Message ?? "فشل في تحميل العملاء.";
+            }
+        }
+        catch (HttpRequestException httpEx)
+        {
+            errorMessage = "خطأ في الاتصال بالخادم: " + httpEx.Message;
+        }
+        catch (JsonException jsonEx)
+        {
+            errorMessage = "خطأ في تحليل البيانات: " + jsonEx.Message;
+        }
+        catch (Exception ex)
+        {
+            errorMessage = "خطأ غير متوقع: " + ex.Message;
+        }
+    }
+
+    private void EditCustomer(int id)
+    {
+        NavigationManager.NavigateTo($"/edit-customer/{id}");
+    }
+
+    private async Task DeleteCustomer(int id)
+    {
+        var response = await Http.DeleteAsync($"https://localhost:7252/Customer/Delete/{id}");
+        if (response.IsSuccessStatusCode)
+        {
+            await LoadCustomers();
+        }
+    }
+}

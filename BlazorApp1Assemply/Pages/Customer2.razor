@@ -1,0 +1,97 @@
+﻿@page "/add-customer"
+ 
+@inject HttpClient Http
+
+<h3>إضافة عميل جديد</h3>
+
+<EditForm Model="newCustomer" OnValidSubmit="SaveCustomer">
+    <DataAnnotationsValidator />
+    <ValidationSummary />
+
+    <div class="form-group">
+        <label for="givenNames">الاسم</label>
+        <InputText id="givenNames" class="form-control" @bind-Value="newCustomer.GivenNames" required />
+    </div>
+
+    <div class="form-group">
+        <label for="nickname">الكنية</label>
+        <InputText id="nickname" class="form-control" @bind-Value="newCustomer.Nickname" />
+    </div>
+
+    <div class="form-group">
+        <label for="gender">الجنس</label>
+        <InputSelect id="gender" class="form-control" @bind-Value="newCustomer.Gender">
+            <option value="">اختر الجنس</option>
+            <option value="M">ذكر</option>
+            <option value="F">أنثى</option>
+        </InputSelect>
+    </div>
+    <div class="form-group">
+        <label for="DocId">DocId</label>
+        <InputText id="nickname" class="form-control" @bind-Value="newCustomer.DocId" />
+    </div>
+    <div class="form-group">
+        <label for="DocType">DocType</label>
+        <InputText id="nickname" class="form-control" @bind-Value="newCustomer.DocType" />
+    </div>
+
+    <div class="form-group">
+        <label for="email">البريد الإلكتروني</label>
+        <InputText id="email" type="email" class="form-control" @bind-Value="newCustomer.EmailAddress" required />
+    </div>
+
+    <div class="form-group">
+        <label for="mobile">الهاتف</label>
+        <InputText id="mobile" class="form-control" @bind-Value="newCustomer.Mobile" required />
+    </div>
+    <div class="form-group">
+        <label for="Username">username</label>
+        <InputText id="mobile" class="form-control" @bind-Value="newCustomer.Username" required />
+    </div>
+    <div class="form-group">
+        <label for="Password">Password</label>
+        <InputText id="mobile" class="form-control" @bind-Value="newCustomer.Password" required />
+    </div>
+
+    <button type="submit" class="btn btn-primary">إضافة</button>
+</EditForm>
+
+@if (!string.IsNullOrEmpty(successMessage))
+{
+    <div class="alert alert-success mt-3">@successMessage</div>
+}
+
+@if (!string.IsNullOrEmpty(errorMessage))
+{
+    <div class="alert alert-danger mt-3">@errorMessage</div>
+}
+
+@code {
+    private Models.Customer newCustomer = new Models.Customer();
+    private string successMessage;
+    private string errorMessage;
+
+    private async Task SaveCustomer()
+    {
+        try
+        {
+            var response = await Http.PostAsJsonAsync("https://localhost:7252/Customer/Create", newCustomer);
+            if (response.IsSuccessStatusCode)
+            {
+                successMessage = "تم إضافة العميل بنجاح!";
+                newCustomer = new Models.Customer(); // إعادة تعيين النموذج بعد الإضافة
+                errorMessage = null;
+            }
+            else
+            {
+                errorMessage = "فشل في إضافة العميل: " + response.ReasonPhrase;
+                successMessage = null;
+            }
+        }
+        catch (Exception ex)
+        {
+            errorMessage = "خطأ أثناء إضافة العميل: " + ex.Message;
+            successMessage = null;
+        }
+    }
+}
